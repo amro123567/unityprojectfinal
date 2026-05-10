@@ -4,27 +4,18 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
-using CodeMonkey.HealthSystemCM;
 
+/// <summary>
+/// Services + scene portal. All menu / pause / HUD is built by MandatoryCourseUi for reliability.
+/// </summary>
 public sealed class BootstrapRuntime : MonoBehaviour
 {
     public static BootstrapRuntime Active { get; private set; }
 
-    static Sprite _whiteUiSprite;
+    Font _gameOverFont;
 
-    Transform hudSurface;
-    Font uiFont;
-    GameObject gameOverOverlay;
+    GameObject _gameOverOverlay;
 
-    Font ResolveUIFont()
-    {
-        uiFont ??= GameUiFonts.DefaultUIFont();
-        return uiFont;
-    }
-
-    /// <summary>
-    /// Creates the bootstrap host if needed. Safe to call from gameplay (e.g. death) before any UI has run.
-    /// </summary>
     public static void EnsureHostExists()
     {
         if (Active != null)
@@ -36,16 +27,10 @@ public sealed class BootstrapRuntime : MonoBehaviour
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    static void CreateHostBeforeFirstScene()
-    {
-        EnsureHostExists();
-    }
+    static void CreateHostBeforeFirstScene() => EnsureHostExists();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void CreateHostAfterFirstScene()
-    {
-        EnsureHostExists();
-    }
+    static void CreateHostAfterFirstScene() => EnsureHostExists();
 
     void Awake()
     {
@@ -56,108 +41,72 @@ public sealed class BootstrapRuntime : MonoBehaviour
         }
 
         Active = this;
-        uiFont = GameUiFonts.DefaultUIFont();
 
-        hudSurface = new GameObject("RuntimeUISurface").transform;
-        hudSurface.SetParent(transform, false);
-
-        SceneManager.sceneLoaded += SceneLoadedHandler;
+        SceneManager.sceneLoaded += OnSceneLoaded;
         PrepareGlobalServices();
+        MandatoryCourseUi.Ensure();
 
-        Scene bootScene = SceneManager.GetActiveScene();
-        if (bootScene.IsValid() && bootScene.isLoaded)
-            SceneLoadedHandler(bootScene, LoadSceneMode.Single);
+        Scene boot = SceneManager.GetActiveScene();
+        if (boot.IsValid() && boot.isLoaded)
+            DispatchSceneBoot(boot);
         else
-            StartCoroutine(CoDeferredInitialUiBoot());
-
-        StartCoroutine(EnsureGameplayUiHealthy());
+            StartCoroutine(CoDeferredDispatch());
     }
 
-    IEnumerator CoDeferredInitialUiBoot()
+    IEnumerator CoDeferredDispatch()
     {
-        yield return null;
         yield return null;
         Scene s = SceneManager.GetActiveScene();
-        if (s.IsValid() && s.isLoaded && hudSurface.childCount == 0)
-            SceneLoadedHandler(s, LoadSceneMode.Single);
-    }
-
-    /// <summary>
-    /// Re-applies menu/HUD if the first pass missed (scene timing, partial exceptions, font init).
-    /// </summary>
-    IEnumerator EnsureGameplayUiHealthy()
-    {
-        for (int pass = 0; pass < 20; pass++)
-        {
-            yield return null;
-
-            if (hudSurface == null)
-                continue;
-
-            Scene s = SceneManager.GetActiveScene();
-            if (!s.IsValid() || !s.isLoaded)
-                continue;
-
-            uiFont ??= GameUiFonts.DefaultUIFont();
-
-            bool hub = HubSceneUtility.IsMainHubScene(s);
-
-            bool needsRebuild =
-                hub
-                    ? hudSurface.childCount == 0
-                    : PauseFlow.FocusCanvas == null || PauseFlow.Instance == null;
-
-            if (needsRebuild)
-            {
-                try
-                {
-                    SceneLoadedHandler(s, LoadSceneMode.Single);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError(
-                        $"BootstrapRuntime: UI rebuild attempt failed ({s.name}). {ex.Message}\n{ex.StackTrace}");
-                }
-            }
-
-            hub = HubSceneUtility.IsMainHubScene(s);
-
-            bool happy =
-                hub ? hudSurface.childCount > 0
-                    : PauseFlow.FocusCanvas != null && PauseFlow.Instance != null;
-
-            if (happy)
-                yield break;
-        }
-
-        Scene final = SceneManager.GetActiveScene();
-        Debug.LogWarning(
-            $"BootstrapRuntime: UI did not converge. scene={final.name} buildIndex={final.buildIndex} " +
-            $"hudChildren={hudSurface?.childCount ?? -1} FocusCanvas={(PauseFlow.FocusCanvas != null)} " +
-            $"PauseFlow={(PauseFlow.Instance != null)} Font={(GameUiFonts.DefaultUIFont() != null)}");
+        if (s.IsValid() && s.isLoaded)
+            DispatchSceneBoot(s);
     }
 
     void OnDestroy()
     {
-        SceneManager.sceneLoaded -= SceneLoadedHandler;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
         if (Active == this)
             Active = null;
     }
 
-    static Sprite WhiteUiSprite()
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode) =>
+        DispatchSceneBoot(scene);
+
+    void DispatchSceneBoot(Scene scene)
     {
-        if (_whiteUiSprite != null)
-            return _whiteUiSprite;
-
-        Texture2D t = Texture2D.whiteTexture;
-        _whiteUiSprite = Sprite.Create(
-            t,
-            new Rect(0f, 0f, t.width, t.height),
-            new Vector2(0.5f, 0.5f),
-            100f);
-
-        return _whiteUiSprite;
+        try
+        {
+            DispatchSceneBootCore(scene);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(
+                $"BootstrapRuntime scene boot failed for '{scene.name}': {ex.Message}\n{ex.StackTrace}");
+        }
     }
+
+    void DispatchSceneBootCore(Scene scene)
+    {
+        EnsureEventSystemForUi();
+        ProfessorFallbackUi.Clear();
+
+        PauseFlow.PauseMenuEnabled = true;
+
+        ClearGameOverUi();
+        OptionsHost.DropSurface();
+
+        MandatoryCourseUi.Ensure();
+
+        MandatoryCourseUi.Instance?.RebuildForScene(scene);
+
+        if (!HubSceneUtility.IsMainHubScene(scene))
+            SpawnExitGate(scene.buildIndex);
+
+        WarmSlidePool();
+    }
+
+    /// <summary>Public hook if other systems spawn UI before Mandatory runs.</summary>
+    public void SpawnVictoryPortal(int buildIndex) =>
+        SpawnExitGate(buildIndex);
 
     void PrepareGlobalServices()
     {
@@ -166,13 +115,11 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
         if (SaveSystem.Instance == null)
             new GameObject("SaveSystem").AddComponent<SaveSystem>();
-
-        WarmSlidePool();
     }
 
     static void EnsureEventSystemForUi()
     {
-        if (Object.FindFirstObjectByType<EventSystem>() != null)
+        if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null)
             return;
 
         GameObject es = new GameObject("EventSystem");
@@ -194,71 +141,12 @@ public sealed class BootstrapRuntime : MonoBehaviour
             pool.RegisterRuntimePool("SlideDust", pooledPrefab, 26);
     }
 
-    void SceneLoadedHandler(Scene scene, LoadSceneMode mode)
-    {
-        try
-        {
-            SceneLoadedHandlerCore(scene, mode);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError(
-                $"BootstrapRuntime SceneLoadedHandler failed for '{scene.name}': {ex.Message}\n{ex.StackTrace}");
-        }
-    }
-
-    void SceneLoadedHandlerCore(Scene scene, LoadSceneMode mode)
-    {
-        ResolveUIFont();
-
-        EnsureEventSystemForUi();
-        ProfessorFallbackUi.Clear();
-
-        PauseFlow.PauseMenuEnabled = true;
-
-        ClearGameOverUi();
-        OptionsHost.DropSurface();
-        PauseFlow.FocusCanvas = null;
-
-        foreach (Transform child in hudSurface)
-            Destroy(child.gameObject);
-
-        bool useMainMenuUi = HubSceneUtility.IsMainHubScene(scene);
-
-        if (useMainMenuUi)
-            BuildMainMenuShell();
-        else
-        {
-            BuildHudShell();
-            BuildPauseMenuShell();
-
-            SpawnExitGate(scene.buildIndex);
-        }
-    }
-
-    void SuppressStaleSceneHealthBars()
-    {
-        try
-        {
-            HealthBarUI[] bars = Object.FindObjectsOfType<HealthBarUI>(true);
-            for (int i = 0; i < bars.Length; i++)
-            {
-                if (bars[i] != null)
-                    bars[i].gameObject.SetActive(false);
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"BootstrapRuntime: could not hide legacy health bars: {ex.Message}");
-        }
-    }
-
     void ClearGameOverUi()
     {
-        if (gameOverOverlay != null)
+        if (_gameOverOverlay != null)
         {
-            Destroy(gameOverOverlay);
-            gameOverOverlay = null;
+            Destroy(_gameOverOverlay);
+            _gameOverOverlay = null;
         }
 
         PauseFlow.PauseMenuEnabled = true;
@@ -266,25 +154,27 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     public void ShowGameOverScreen()
     {
-        if (gameOverOverlay != null)
+        if (_gameOverOverlay != null)
             return;
 
-        if (uiFont == null)
-            uiFont = GameUiFonts.DefaultUIFont();
-
+        _gameOverFont = GameUiFonts.DefaultUIFont();
         Time.timeScale = 0f;
         PauseFlow.PauseMenuEnabled = false;
 
         Canvas shell = BuildTopSortingCanvas();
-        gameOverOverlay = shell.gameObject;
+        _gameOverOverlay = shell.gameObject;
 
         GameObject tintGo = new GameObject("GameOverTint");
         tintGo.transform.SetParent(shell.transform, false);
+
         RectTransform tintRect = tintGo.AddComponent<RectTransform>();
+
         StretchUiFull(tintRect);
 
         Image dim = tintGo.AddComponent<Image>();
+
         dim.color = new Color(0.02f, 0.015f, 0.012f, 0.92f);
+
         dim.raycastTarget = true;
 
         VerticalLayoutGroup stack =
@@ -294,6 +184,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
             new Color(0.98f, 0.58f, 0.35f);
 
         Text blurbGo = Heading(stack.transform, "The forest claims another wanderer.", 22);
+
         blurbGo.color = new Color(0.92f, 0.82f, 0.74f);
 
         PrimaryButton(stack.transform, "Try Again", () =>
@@ -303,6 +194,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
             ClearGameOverUi();
             if (s.buildIndex >= 0)
                 SceneManager.LoadScene(s.buildIndex);
+
             else if (!string.IsNullOrEmpty(s.name))
                 SceneManager.LoadScene(s.name);
         });
@@ -310,7 +202,9 @@ public sealed class BootstrapRuntime : MonoBehaviour
         PrimaryButton(stack.transform, "Main Menu", () =>
         {
             Time.timeScale = 1f;
+
             ClearGameOverUi();
+
             SceneLoader.Instance?.LoadScene(0);
         });
 
@@ -319,6 +213,14 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void SpawnExitGate(int idx)
     {
+        GoalGate[] oldGates = UnityEngine.Object.FindObjectsOfType<GoalGate>();
+
+        foreach (GoalGate gg in oldGates)
+        {
+            if (gg != null)
+                Destroy(gg.gameObject);
+        }
+
         GameObject player = GameObject.FindGameObjectWithTag("Player");
 
         Vector3 origin = player != null
@@ -326,201 +228,18 @@ public sealed class BootstrapRuntime : MonoBehaviour
             : new Vector3(18f, -1f, 0f);
 
         GameObject gate = new GameObject("VictoryPortal");
+
         gate.transform.position = origin;
 
         BoxCollider2D box = gate.AddComponent<BoxCollider2D>();
+
         box.isTrigger = true;
+
         box.size = new Vector2(2.4f, 6f);
 
         GoalGate gateBehaviour = gate.AddComponent<GoalGate>();
+
         gateBehaviour.Configure(idx);
-    }
-
-    void BuildMainMenuShell()
-    {
-        Canvas canvas = CreateCanvas(hudSurface, 28600);
-        GraphicRaycaster raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
-        raycaster.ignoreReversedGraphics = true;
-
-        GameObject dimGo = new GameObject("MainMenuBackdrop");
-        dimGo.transform.SetParent(canvas.transform, false);
-
-        RectTransform dimRect = dimGo.AddComponent<RectTransform>();
-
-        StretchUiFull(dimRect);
-
-        Image dimImg = dimGo.AddComponent<Image>();
-        dimImg.color = new Color(0.1f, 0.06f, 0.036f, 0.62f);
-        dimImg.raycastTarget = false;
-
-        VerticalLayoutGroup stack = PanelStack(
-            canvas.transform,
-            new Color(0.08f, 0.045f, 0.028f, 0.93f));
-
-        Text title = Heading(stack.transform, "Autumn Vanguard", 40);
-        title.color = new Color(0.95f, 0.62f, 0.37f);
-
-        Text tag = Heading(stack.transform, "Fall course build • Two grove levels • Pause & save-ready", 20);
-        tag.color = new Color(0.93f, 0.8f, 0.62f);
-
-        Text keys = Heading(stack.transform, "Help: Esc, Tab, or P on this hub", 18);
-        keys.color = new Color(0.85f, 0.73f, 0.52f);
-
-        SaveSystem saver = SaveSystem.Instance;
-
-        bool canResume = saver != null && saver.HasSave;
-
-        PrimaryButton(stack.transform, "New Journey", () =>
-        {
-            saver?.DeleteSave();
-            Time.timeScale = 1f;
-
-            SceneLoader.Instance?.LoadScene(1);
-        });
-
-        Button resume = PrimaryButton(stack.transform, "Continue", () =>
-        {
-            if (saver?.HasSave == true)
-            {
-                int target = Mathf.Clamp(saver.GetData().currentLevel, 1,
-                    Mathf.Max(1, SceneManager.sceneCountInBuildSettings - 1));
-
-                Time.timeScale = 1f;
-                SceneLoader.Instance?.LoadScene(target);
-            }
-        });
-
-        resume.interactable = canResume;
-
-        PrimaryButton(stack.transform, "Adjust Audio", () => OptionsHost.Toggle(canvas.transform));
-
-        PrimaryButton(stack.transform, "Quit", () => SceneLoader.Instance?.QuitGame());
-
-        MainMenuEscPanel esc = canvas.gameObject.AddComponent<MainMenuEscPanel>();
-        esc.Setup(uiFont);
-    }
-
-    void BuildPauseMenuShell()
-    {
-        GameObject hud = new GameObject("PauseController");
-        hud.transform.SetParent(hudSurface, false);
-        hud.AddComponent<PauseFlow>();
-
-    }
-
-    void BuildHudShell()
-    {
-        Canvas canvas = CreateCanvas(hudSurface, 28400);
-        canvas.gameObject.AddComponent<GraphicRaycaster>();
-
-        GameObject cluster = new GameObject("HudCluster");
-        cluster.transform.SetParent(canvas.transform, false);
-
-        RectTransform clusterRect = cluster.AddComponent<RectTransform>();
-        clusterRect.anchorMin = new Vector2(0f, 1f);
-        clusterRect.anchorMax = new Vector2(0f, 1f);
-        clusterRect.pivot = new Vector2(0f, 1f);
-        clusterRect.anchoredPosition = new Vector2(42f, -36f);
-
-        VerticalLayoutGroup stack = cluster.AddComponent<VerticalLayoutGroup>();
-        stack.childAlignment = TextAnchor.UpperLeft;
-        stack.spacing = 12f;
-        stack.childControlWidth = true;
-        stack.childControlHeight = true;
-        stack.childForceExpandWidth = false;
-        stack.childForceExpandHeight = false;
-
-        GameObject barBg = new GameObject("RuntimeHealthBarBacking");
-        barBg.transform.SetParent(cluster.transform, false);
-
-        LayoutElement barSizing = barBg.AddComponent<LayoutElement>();
-        barSizing.minHeight = 30f;
-        barSizing.preferredHeight = 30f;
-        barSizing.minWidth = 440f;
-        barSizing.preferredWidth = 440f;
-
-        Image barPlate = barBg.AddComponent<Image>();
-        barPlate.sprite = WhiteUiSprite();
-        barPlate.color = new Color(0.12f, 0.07f, 0.05f, 0.96f);
-        barPlate.raycastTarget = false;
-
-        GameObject fillGo = new GameObject("RuntimeHealthFill");
-        fillGo.transform.SetParent(barBg.transform, false);
-
-        RectTransform fillRect = fillGo.AddComponent<RectTransform>();
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = new Vector2(4f, 4f);
-        fillRect.offsetMax = new Vector2(-4f, -4f);
-
-        Image fillImg = fillGo.AddComponent<Image>();
-        fillImg.sprite = WhiteUiSprite();
-        fillImg.type = Image.Type.Filled;
-        fillImg.fillMethod = Image.FillMethod.Horizontal;
-        fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
-        fillImg.color = new Color(0.9f, 0.22f, 0.16f, 1f);
-        fillImg.fillAmount = 1f;
-        fillImg.raycastTarget = false;
-
-        GameObject hud = new GameObject("HudBlock");
-        hud.transform.SetParent(cluster.transform, false);
-
-        LayoutElement hudSizing = hud.AddComponent<LayoutElement>();
-        hudSizing.minWidth = 440f;
-        hudSizing.minHeight = 52f;
-
-        RectTransform rect = hud.AddComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(440f, 52f);
-
-        UnityEngine.UI.Outline halo = hud.AddComponent<UnityEngine.UI.Outline>();
-
-        UnityEngine.UI.Shadow shadow = hud.AddComponent<UnityEngine.UI.Shadow>();
-
-        Text label = hud.AddComponent<Text>();
-
-        ColorUtility.TryParseHtmlString("#2E1F12", out Color body);
-        halo.effectColor = new Color(0f, 0f, 0f, 0.55f);
-
-        halo.effectDistance = new Vector2(1.2f, -1f);
-
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
-
-        shadow.effectDistance = new Vector2(1.8f, -1.8f);
-
-        label.font = ResolveUIFont();
-        label.fontSize = 26;
-        label.alignment = TextAnchor.UpperLeft;
-        label.color = body;
-        label.raycastTarget = false;
-
-        LiveHud hudDriver = hud.AddComponent<LiveHud>();
-        hudDriver.Bind(label, fillImg);
-
-        PauseFlow.FocusCanvas = canvas;
-
-        SuppressStaleSceneHealthBars();
-
-        AppendHudPauseControl(canvas);
-    }
-
-    Canvas CreateCanvas(Transform parent, int sortingOrder = 4900)
-    {
-        GameObject go = new GameObject("RuntimeCanvas");
-
-        go.transform.SetParent(parent, false);
-
-        Canvas canvas = go.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = sortingOrder;
-
-        CanvasScaler scaler = go.AddComponent<CanvasScaler>();
-
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-
-        scaler.matchWidthOrHeight = 0.5f;
-
-        return canvas;
     }
 
     Canvas BuildTopSortingCanvas()
@@ -545,65 +264,12 @@ public sealed class BootstrapRuntime : MonoBehaviour
     static void StretchUiFull(RectTransform rect)
     {
         rect.anchorMin = Vector2.zero;
+
         rect.anchorMax = Vector2.one;
+
         rect.offsetMin = Vector2.zero;
+
         rect.offsetMax = Vector2.zero;
-    }
-
-    void AppendHudPauseControl(Canvas gameplayCanvas)
-    {
-        GameObject dock = new GameObject("HudPauseDock");
-        dock.transform.SetParent(gameplayCanvas.transform, false);
-
-        RectTransform dockRect = dock.AddComponent<RectTransform>();
-        dockRect.anchorMin = new Vector2(1f, 1f);
-        dockRect.anchorMax = new Vector2(1f, 1f);
-        dockRect.pivot = new Vector2(1f, 1f);
-        dockRect.anchoredPosition = new Vector2(-22f, -20f);
-
-        VerticalLayoutGroup col = dock.AddComponent<VerticalLayoutGroup>();
-        col.childAlignment = TextAnchor.UpperRight;
-        col.spacing = 10f;
-
-        GameObject hint = new GameObject("PauseHints");
-        hint.transform.SetParent(dock.transform, false);
-
-        LayoutElement hintLe = hint.AddComponent<LayoutElement>();
-        hintLe.minHeight = 38f;
-
-        Text ht = hint.AddComponent<Text>();
-        ht.font = ResolveUIFont();
-        ht.fontSize = 17;
-        ht.alignment = TextAnchor.MiddleRight;
-        ht.color = new Color(0.92f, 0.74f, 0.54f);
-        ht.text = "Pause: Esc  •  Tab  •  P";
-
-        GameObject tap = new GameObject("HudPauseTap");
-        tap.transform.SetParent(dock.transform, false);
-
-        LayoutElement tapLe = tap.AddComponent<LayoutElement>();
-        tapLe.minWidth = 154f;
-        tapLe.minHeight = 54f;
-
-        Image plate = tap.AddComponent<Image>();
-        plate.color = new Color(0.26f, 0.17f, 0.09f, 0.94f);
-
-        Button btn = tap.AddComponent<Button>();
-        btn.targetGraphic = plate;
-
-        GameObject cap = new GameObject("Cap");
-        cap.transform.SetParent(tap.transform, false);
-        RectTransform capRect = cap.AddComponent<RectTransform>();
-        StretchUiFull(capRect);
-
-        Text capText = cap.AddComponent<Text>();
-        capText.font = ResolveUIFont();
-        capText.fontSize = 23;
-        capText.text = "Pause menu";
-        capText.color = Color.white;
-        capText.alignment = TextAnchor.MiddleCenter;
-
-        btn.onClick.AddListener(() => PauseFlow.RequestTogglePause());
     }
 
     VerticalLayoutGroup PanelStack(Transform parent, Color backdrop)
@@ -642,7 +308,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         go.transform.SetParent(parent, false);
 
         Text text = go.AddComponent<Text>();
-        text.font = ResolveUIFont();
+        text.font = _gameOverFont ?? GameUiFonts.DefaultUIFont();
         text.fontSize = size;
 
         text.alignment = TextAnchor.MiddleCenter;
@@ -655,15 +321,16 @@ public sealed class BootstrapRuntime : MonoBehaviour
         return text;
     }
 
-    Button PrimaryButton(Transform parent, string caption, UnityEngine.Events.UnityAction listener)
+    Button PrimaryButton(Transform parent, string caption,
+        UnityEngine.Events.UnityAction listener)
     {
         GameObject go = new GameObject($"Button_{caption}");
 
         go.transform.SetParent(parent, false);
 
-        Image panel = go.AddComponent<Image>();
+        Image panelImg = go.AddComponent<Image>();
 
-        panel.color = new Color(0.18f, 0.12f, 0.08f, 0.75f);
+        panelImg.color = new Color(0.18f, 0.12f, 0.08f, 0.75f);
 
         Button button = go.AddComponent<Button>();
 
@@ -694,7 +361,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         textRect.offsetMax = Vector2.zero;
 
         Text text = textGo.AddComponent<Text>();
-        text.font = ResolveUIFont();
+        text.font = _gameOverFont ?? GameUiFonts.DefaultUIFont();
         text.fontSize = 26;
         text.alignment = TextAnchor.MiddleCenter;
         text.text = caption;
