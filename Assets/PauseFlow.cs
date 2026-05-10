@@ -6,6 +6,9 @@ public sealed class PauseFlow : MonoBehaviour
 {
     public static Canvas FocusCanvas;
 
+    /// <summary>When false, Esc pause is ignored (e.g. game over).</summary>
+    public static bool PauseMenuEnabled { get; set; } = true;
+
     bool menuOpen;
 
     RectTransform veil;
@@ -15,21 +18,43 @@ public sealed class PauseFlow : MonoBehaviour
     void Awake()
     {
         labelFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        if (labelFont == null)
+            labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
         BuildPanel();
         SetMenuVisible(false);
     }
 
     void Update()
     {
+        if (!PauseMenuEnabled)
+            return;
+
         if (Input.GetKeyDown(KeyCode.Escape))
             ToggleMenu();
     }
 
+    /// <returns>False for main-menu scenes; true when playing a level scene (includes editor Play with buildIndex -1).</returns>
+    static bool IsGameplayLevelScene(Scene scene)
+    {
+        bool namedMenu =
+            scene.name.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+        if (scene.buildIndex == 0)
+            return false;
+
+        if (scene.buildIndex < 0)
+            return !namedMenu;
+
+        return scene.buildIndex >= 1;
+    }
+
     void ToggleMenu()
     {
-        int index = SceneManager.GetActiveScene().buildIndex;
+        if (veil == null)
+            return;
 
-        if (index <= 0 || veil == null)
+        if (!IsGameplayLevelScene(SceneManager.GetActiveScene()))
             return;
 
         SetMenuVisible(!menuOpen);
@@ -73,6 +98,8 @@ public sealed class PauseFlow : MonoBehaviour
         VerticalLayoutGroup stack = StackColumn(overlay.transform);
 
         Title(stack.transform, "Paused", 38f);
+
+        Title(stack.transform, "(Esc closes this pause menu)", 18);
 
         LinkButton(stack.transform, "Resume", ResumeClicked);
 

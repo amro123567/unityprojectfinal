@@ -82,6 +82,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void SceneLoadedHandler(Scene scene, LoadSceneMode mode)
     {
+        PauseFlow.PauseMenuEnabled = true;
+
         ClearGameOverUi();
         OptionsHost.DropSurface();
         PauseFlow.FocusCanvas = null;
@@ -113,6 +115,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
             Destroy(gameOverOverlay);
             gameOverOverlay = null;
         }
+
+        PauseFlow.PauseMenuEnabled = true;
     }
 
     public void ShowGameOverScreen()
@@ -128,6 +132,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         }
 
         Time.timeScale = 0f;
+        PauseFlow.PauseMenuEnabled = false;
 
         Transform parentSurface = PauseFlow.FocusCanvas != null
             ? PauseFlow.FocusCanvas.transform
@@ -242,6 +247,9 @@ public sealed class BootstrapRuntime : MonoBehaviour
         PrimaryButton(stack.transform, "Adjust Audio", () => OptionsHost.Toggle(canvas.transform));
 
         PrimaryButton(stack.transform, "Quit", () => SceneLoader.Instance?.QuitGame());
+
+        MainMenuEscPanel esc = canvas.gameObject.AddComponent<MainMenuEscPanel>();
+        esc.Setup(uiFont);
     }
 
     void BuildPauseMenuShell()

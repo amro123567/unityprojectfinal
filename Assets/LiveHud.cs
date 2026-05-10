@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public sealed class LiveHud : MonoBehaviour
@@ -32,6 +33,23 @@ public sealed class LiveHud : MonoBehaviour
         int current = Mathf.Max(1, Mathf.RoundToInt(hero.GetHealthCurrent()));
         int cap = Mathf.Max(1, Mathf.RoundToInt(hero.GetHealthMax()));
 
-        readout.text = $"{current}/{cap}";
+        Scene s = SceneManager.GetActiveScene();
+        readout.text = $"{DescribeLevelLine(s)}\n{current}/{cap}";
+    }
+
+    static string DescribeLevelLine(Scene s)
+    {
+        if (s.buildIndex >= 1)
+            return $"Level {s.buildIndex}";
+
+        string n = s.name;
+        if (n.StartsWith("Level", System.StringComparison.OrdinalIgnoreCase))
+        {
+            string tail = n.Substring("Level".Length);
+            if (int.TryParse(tail, out int num))
+                return $"Level {num}";
+        }
+
+        return n.Length > 0 ? n : "Level";
     }
 }
