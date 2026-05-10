@@ -65,16 +65,7 @@ public sealed class PauseFlow : MonoBehaviour
 
     static bool IsGameplayLevelScene(Scene scene)
     {
-        bool namedMenu =
-            scene.name.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0;
-
-        if (scene.buildIndex == 0)
-            return false;
-
-        if (scene.buildIndex < 0)
-            return !namedMenu;
-
-        return scene.buildIndex >= 1;
+        return !BootstrapRuntime.IsMainHubScene(scene);
     }
 
     void TryRebuildVeilIfNeeded()

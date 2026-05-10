@@ -91,11 +91,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         foreach (Transform child in hudSurface)
             Destroy(child.gameObject);
 
-        bool menuByName =
-            scene.name.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0;
-
-        bool useMainMenuUi = scene.buildIndex == 0
-            || (scene.buildIndex < 0 && menuByName);
+        bool useMainMenuUi = IsMainHubScene(scene);
 
         if (useMainMenuUi)
             BuildMainMenuShell();
@@ -106,6 +102,29 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
             SpawnExitGate(scene.buildIndex);
         }
+    }
+
+    /// <summary>
+    /// True for build index 0 and for editor Play on scenes named MainMenu / "Main Menu".
+    /// </summary>
+    public static bool IsMainHubScene(Scene scene)
+    {
+        string n = string.IsNullOrEmpty(scene.name) ? string.Empty : scene.name.Trim();
+
+        if (scene.buildIndex == 0)
+            return true;
+
+        if (scene.buildIndex < 0)
+        {
+            string compact = n.Replace(" ", string.Empty);
+            if (compact.Equals("MainMenu", System.StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (n.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+
+        return false;
     }
 
     void ClearGameOverUi()
@@ -197,14 +216,33 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void BuildMainMenuShell()
     {
-        Canvas canvas = CreateCanvas(hudSurface);
+        Canvas canvas = CreateCanvas(hudSurface, 5200);
         GraphicRaycaster raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
         raycaster.ignoreReversedGraphics = true;
 
-        VerticalLayoutGroup stack = PanelStack(canvas.transform, Color.clear);
+        GameObject dimGo = new GameObject("MainMenuBackdrop");
+        dimGo.transform.SetParent(canvas.transform, false);
 
-        Text title = Heading(stack.transform, "Autumn Vanguard", 38);
-        title.color = new Color(0.95f, 0.6f, 0.35f);
+        RectTransform dimRect = dimGo.AddComponent<RectTransform>();
+
+        StretchUiFull(dimRect);
+
+        Image dimImg = dimGo.AddComponent<Image>();
+        dimImg.color = new Color(0.1f, 0.06f, 0.036f, 0.62f);
+        dimImg.raycastTarget = false;
+
+        VerticalLayoutGroup stack = PanelStack(
+            canvas.transform,
+            new Color(0.08f, 0.045f, 0.028f, 0.93f));
+
+        Text title = Heading(stack.transform, "Autumn Vanguard", 40);
+        title.color = new Color(0.95f, 0.62f, 0.37f);
+
+        Text tag = Heading(stack.transform, "Fall course build • Two grove levels • Pause & save-ready", 20);
+        tag.color = new Color(0.93f, 0.8f, 0.62f);
+
+        Text keys = Heading(stack.transform, "Help: Esc, Tab, or P on this hub", 18);
+        keys.color = new Color(0.85f, 0.73f, 0.52f);
 
         SaveSystem saver = SaveSystem.Instance;
 
@@ -250,7 +288,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void BuildHudShell()
     {
-        Canvas canvas = CreateCanvas(hudSurface);
+        Canvas canvas = CreateCanvas(hudSurface, 4900);
         canvas.gameObject.AddComponent<GraphicRaycaster>();
 
         GameObject hud = new GameObject("HudBlock");
@@ -291,7 +329,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         AppendHudPauseControl(canvas);
     }
 
-    Canvas CreateCanvas(Transform parent)
+    Canvas CreateCanvas(Transform parent, int sortingOrder = 4900)
     {
         GameObject go = new GameObject("RuntimeCanvas");
 
@@ -299,7 +337,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
         Canvas canvas = go.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 4800;
+        canvas.sortingOrder = sortingOrder;
 
         CanvasScaler scaler = go.AddComponent<CanvasScaler>();
 

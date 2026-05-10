@@ -27,7 +27,11 @@ public sealed class MainMenuEscPanel : MonoBehaviour
         if (!built || sheet == null)
             return;
 
-        if (Input.GetKeyDown(KeyCode.Escape))
+        bool toggle = Input.GetKeyDown(KeyCode.Escape)
+            || Input.GetKeyDown(KeyCode.Tab)
+            || Input.GetKeyDown(KeyCode.P);
+
+        if (toggle)
             sheet.SetActive(!sheet.activeSelf);
     }
 
@@ -80,7 +84,7 @@ public sealed class MainMenuEscPanel : MonoBehaviour
             new Color(0.94f, 0.86f, 0.76f));
         Line(
             column.transform,
-            "Esc on this menu — open or hide this panel.",
+            "Esc, Tab, or P on this menu — toggle this panel.",
             20,
             Color.white);
         Line(
