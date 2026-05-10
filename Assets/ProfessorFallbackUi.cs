@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 /// <summary>
 /// Minimal game-over overlay if BootstrapRuntime cannot be added (missing script asset). Keeps rubric demo playable.
@@ -98,15 +97,7 @@ public static class ProfessorFallbackUi
         }
     }
 
-    static void EnsureEventSystemExists()
-    {
-        if (Object.FindFirstObjectByType<EventSystem>() != null)
-            return;
-
-        GameObject es = new GameObject("EventSystem");
-        es.AddComponent<EventSystem>();
-        es.AddComponent<StandaloneInputModule>();
-    }
+    static void EnsureEventSystemExists() => UiInputEnsure.Bootstrap();
 
     static void EnsureSceneLoaderExists()
     {

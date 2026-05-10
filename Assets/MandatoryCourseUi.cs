@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using CodeMonkey.HealthSystemCM;
 
 /// <summary>
@@ -297,6 +296,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         Image hubBg = hub.AddComponent<Image>();
         hubBg.sprite = SpriteUtilityWhite();
         hubBg.color = new Color(0.05f, 0.035f, 0.022f, 0.94f);
+        hubBg.raycastTarget = false;
 
         GameObject card = new GameObject("MenuCard");
         card.transform.SetParent(hub.transform, false);
@@ -308,6 +308,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         Image cardBg = card.AddComponent<Image>();
         cardBg.sprite = SpriteUtilityWhite();
         cardBg.color = new Color(0.1f, 0.06f, 0.036f, 1f);
+        cardBg.raycastTarget = false;
 
         VerticalLayoutGroup v = card.AddComponent<VerticalLayoutGroup>();
         v.childAlignment = TextAnchor.MiddleCenter;
@@ -325,26 +326,9 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         SaveSystem saver = SaveSystem.Instance;
         bool canContinue = saver != null && saver.HasSave;
 
-        AddMenuButton(v.transform, "NEW JOURNEY", () =>
-        {
-            saver?.DeleteSave();
-            Time.timeScale = 1f;
-            SceneLoader.Instance?.LoadScene(1);
-        });
+        AddMenuButton(v.transform, "NEW JOURNEY", HubNewJourney);
 
-        Button cont = AddMenuButton(v.transform, "CONTINUE", () =>
-        {
-            if (saver?.HasSave != true)
-                return;
-
-            int target = Mathf.Clamp(
-                saver.GetData().currentLevel,
-                1,
-                Mathf.Max(1, SceneManager.sceneCountInBuildSettings - 1));
-
-            Time.timeScale = 1f;
-            SceneLoader.Instance?.LoadScene(target);
-        });
+        Button cont = AddMenuButton(v.transform, "CONTINUE", HubContinue);
         cont.interactable = canContinue;
 
         AddMenuButton(v.transform, "AUDIO / MIX", () => OptionsHost.Toggle(_rootCanvas.transform));
@@ -480,6 +464,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         _healthText.fontStyle = FontStyle.Bold;
         _healthText.alignment = TextAnchor.UpperLeft;
         _healthText.color = new Color(0.16f, 0.09f, 0.045f);
+        _healthText.raycastTarget = false;
 
         Outline ol = textGo.AddComponent<Outline>();
         ol.effectColor = new Color(1f, 1f, 1f, 0.42f);
@@ -527,6 +512,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         t.color = new Color(0.12f, 0.06f, 0f);
         t.alignment = TextAnchor.MiddleCenter;
         t.text = "<b>PAUSE</b>\n<size=20>Tap / Tab • P • Esc</size>";
+        t.raycastTarget = false;
     }
 
     void HideLegacyHealthBars()
@@ -560,6 +546,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         t.alignment = TextAnchor.MiddleCenter;
         t.color = color;
         t.text = line;
+        t.raycastTarget = false;
     }
 
     Button AddMenuButton(Transform holder, string label, UnityAction onClick)
@@ -588,6 +575,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         tfield.alignment = TextAnchor.MiddleCenter;
         tfield.color = new Color(0.97f, 0.91f, 0.74f);
         tfield.text = label;
+        tfield.raycastTarget = false;
 
         return b;
     }
@@ -631,12 +619,37 @@ public sealed class MandatoryCourseUi : MonoBehaviour
 
     void EnsureEventSystem()
     {
-        if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null)
+        UiInputEnsure.Bootstrap();
+    }
+
+    static void HubNewJourney()
+    {
+        SaveSystem.Instance?.DeleteSave();
+        Time.timeScale = 1f;
+        if (SceneLoader.Instance == null)
+            new GameObject("SceneLoader").AddComponent<SceneLoader>();
+
+        SceneLoader.Instance?.LoadScene(1);
+    }
+
+    static void HubContinue()
+    {
+        SaveSystem saver = SaveSystem.Instance;
+
+        if (saver == null || !saver.HasSave)
             return;
 
-        GameObject es = new GameObject("MandatoryEventSystem");
-        es.AddComponent<EventSystem>();
-        es.AddComponent<StandaloneInputModule>();
+        int target = Mathf.Clamp(
+            saver.GetData().currentLevel,
+            1,
+            Mathf.Max(1, SceneManager.sceneCountInBuildSettings - 1));
+
+        Time.timeScale = 1f;
+
+        if (SceneLoader.Instance == null)
+            new GameObject("SceneLoader").AddComponent<SceneLoader>();
+
+        SceneLoader.Instance?.LoadScene(target);
     }
 
     void EnsurePersistedServices()

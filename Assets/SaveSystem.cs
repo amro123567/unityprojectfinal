@@ -109,6 +109,7 @@ public class SaveSystem : MonoBehaviour
     public void DeleteSave()
     {
         PlayerPrefs.DeleteKey(SAVE_KEY);
+        PlayerPrefs.Save();
         gameData = new GameData();
         ApplyNewGameBaseline();
     }

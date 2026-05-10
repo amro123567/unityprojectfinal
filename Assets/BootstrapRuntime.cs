@@ -3,7 +3,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 /// <summary>
 /// Services + scene portal. All menu / pause / HUD is built by MandatoryCourseUi for reliability.
@@ -117,15 +116,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
             new GameObject("SaveSystem").AddComponent<SaveSystem>();
     }
 
-    static void EnsureEventSystemForUi()
-    {
-        if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null)
-            return;
-
-        GameObject es = new GameObject("EventSystem");
-        es.AddComponent<EventSystem>();
-        es.AddComponent<StandaloneInputModule>();
-    }
+    static void EnsureEventSystemForUi() => UiInputEnsure.Bootstrap();
 
     void WarmSlidePool()
     {
