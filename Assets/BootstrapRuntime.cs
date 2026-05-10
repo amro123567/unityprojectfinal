@@ -2,24 +2,41 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using CodeMonkey.HealthSystemCM;
 
 public sealed class BootstrapRuntime : MonoBehaviour
 {
     public static BootstrapRuntime Active { get; private set; }
 
+    static Sprite _whiteUiSprite;
+
     Transform hudSurface;
     Font uiFont;
     GameObject gameOverOverlay;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void CreateHost()
+    /// <summary>
+    /// Creates the bootstrap host if needed. Safe to call from gameplay (e.g. death) before any UI has run.
+    /// </summary>
+    public static void EnsureHostExists()
     {
         if (Active != null)
             return;
 
         GameObject host = new GameObject("BootstrapRuntime");
         DontDestroyOnLoad(host);
-        Active = host.AddComponent<BootstrapRuntime>();
+        host.AddComponent<BootstrapRuntime>();
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void CreateHostBeforeFirstScene()
+    {
+        EnsureHostExists();
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void CreateHostAfterFirstScene()
+    {
+        EnsureHostExists();
     }
 
     void Awake()
@@ -40,12 +57,32 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
         SceneManager.sceneLoaded += SceneLoadedHandler;
         PrepareGlobalServices();
-        SceneLoadedHandler(SceneManager.GetActiveScene(), LoadSceneMode.Single);
+
+        Scene bootScene = SceneManager.GetActiveScene();
+        if (bootScene.IsValid() && bootScene.isLoaded)
+            SceneLoadedHandler(bootScene, LoadSceneMode.Single);
     }
 
     void OnDestroy()
     {
         SceneManager.sceneLoaded -= SceneLoadedHandler;
+        if (Active == this)
+            Active = null;
+    }
+
+    static Sprite WhiteUiSprite()
+    {
+        if (_whiteUiSprite != null)
+            return _whiteUiSprite;
+
+        Texture2D t = Texture2D.whiteTexture;
+        _whiteUiSprite = Sprite.Create(
+            t,
+            new Rect(0f, 0f, t.width, t.height),
+            new Vector2(0.5f, 0.5f),
+            100f);
+
+        return _whiteUiSprite;
     }
 
     void PrepareGlobalServices()
@@ -101,6 +138,16 @@ public sealed class BootstrapRuntime : MonoBehaviour
             BuildPauseMenuShell();
 
             SpawnExitGate(scene.buildIndex);
+        }
+    }
+
+    void SuppressStaleSceneHealthBars()
+    {
+        HealthBarUI[] bars = Object.FindObjectsOfType<HealthBarUI>(true);
+        for (int i = 0; i < bars.Length; i++)
+        {
+            if (bars[i] != null)
+                bars[i].gameObject.SetActive(false);
         }
     }
 
@@ -265,17 +312,67 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void BuildHudShell()
     {
-        Canvas canvas = CreateCanvas(hudSurface, 4900);
+        Canvas canvas = CreateCanvas(hudSurface, 6200);
         canvas.gameObject.AddComponent<GraphicRaycaster>();
 
+        GameObject cluster = new GameObject("HudCluster");
+        cluster.transform.SetParent(canvas.transform, false);
+
+        RectTransform clusterRect = cluster.AddComponent<RectTransform>();
+        clusterRect.anchorMin = new Vector2(0f, 1f);
+        clusterRect.anchorMax = new Vector2(0f, 1f);
+        clusterRect.pivot = new Vector2(0f, 1f);
+        clusterRect.anchoredPosition = new Vector2(42f, -36f);
+
+        VerticalLayoutGroup stack = cluster.AddComponent<VerticalLayoutGroup>();
+        stack.childAlignment = TextAnchor.UpperLeft;
+        stack.spacing = 12f;
+        stack.childControlWidth = true;
+        stack.childControlHeight = true;
+        stack.childForceExpandWidth = false;
+        stack.childForceExpandHeight = false;
+
+        GameObject barBg = new GameObject("RuntimeHealthBarBacking");
+        barBg.transform.SetParent(cluster.transform, false);
+
+        LayoutElement barSizing = barBg.AddComponent<LayoutElement>();
+        barSizing.minHeight = 30f;
+        barSizing.preferredHeight = 30f;
+        barSizing.minWidth = 440f;
+        barSizing.preferredWidth = 440f;
+
+        Image barPlate = barBg.AddComponent<Image>();
+        barPlate.sprite = WhiteUiSprite();
+        barPlate.color = new Color(0.12f, 0.07f, 0.05f, 0.96f);
+        barPlate.raycastTarget = false;
+
+        GameObject fillGo = new GameObject("RuntimeHealthFill");
+        fillGo.transform.SetParent(barBg.transform, false);
+
+        RectTransform fillRect = fillGo.AddComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = new Vector2(4f, 4f);
+        fillRect.offsetMax = new Vector2(-4f, -4f);
+
+        Image fillImg = fillGo.AddComponent<Image>();
+        fillImg.sprite = WhiteUiSprite();
+        fillImg.type = Image.Type.Filled;
+        fillImg.fillMethod = Image.FillMethod.Horizontal;
+        fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fillImg.color = new Color(0.9f, 0.22f, 0.16f, 1f);
+        fillImg.fillAmount = 1f;
+        fillImg.raycastTarget = false;
+
         GameObject hud = new GameObject("HudBlock");
-        hud.transform.SetParent(canvas.transform, false);
+        hud.transform.SetParent(cluster.transform, false);
+
+        LayoutElement hudSizing = hud.AddComponent<LayoutElement>();
+        hudSizing.minWidth = 440f;
+        hudSizing.minHeight = 52f;
 
         RectTransform rect = hud.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(42f, -36f);
+        rect.sizeDelta = new Vector2(440f, 52f);
 
         UnityEngine.UI.Outline halo = hud.AddComponent<UnityEngine.UI.Outline>();
 
@@ -299,9 +396,11 @@ public sealed class BootstrapRuntime : MonoBehaviour
         label.raycastTarget = false;
 
         LiveHud hudDriver = hud.AddComponent<LiveHud>();
-        hudDriver.Bind(label);
+        hudDriver.Bind(label, fillImg);
 
         PauseFlow.FocusCanvas = canvas;
+
+        SuppressStaleSceneHealthBars();
 
         AppendHudPauseControl(canvas);
     }

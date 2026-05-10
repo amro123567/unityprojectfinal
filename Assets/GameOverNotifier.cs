@@ -1,23 +1,30 @@
 using UnityEngine;
 
 /// <summary>
-/// Invokes game-over UI without a compile-time dependency from player scripts → BootstrapRuntime.
+/// Shows game-over UI via BootstrapRuntime. Ensures the host exists so death always has a recipient.
 /// </summary>
 public static class GameOverNotifier
 {
+    static GameOverNotifier()
+    {
+        _ = typeof(BootstrapRuntime);
+    }
+
     public static void Raise()
     {
-        GameObject host = GameObject.Find("BootstrapRuntime");
-        if (host == null)
+        BootstrapRuntime.EnsureHostExists();
+
+        BootstrapRuntime bootstrap = BootstrapRuntime.Active;
+        if (bootstrap == null)
         {
             Debug.LogError(
-                "Game over UI cannot show: GameObject named 'BootstrapRuntime' was not found. " +
-                "Ensure Assets/BootstrapRuntime.cs is present and you are using Play from a level scene.");
+                "Game over UI cannot show: BootstrapRuntime failed to initialize. " +
+                "Ensure Assets/BootstrapRuntime.cs compiled and Assets/GameOverNotifier.cs is unchanged.");
 
             Time.timeScale = 0f;
             return;
         }
 
-        host.SendMessage("ShowGameOverScreen", SendMessageOptions.RequireReceiver);
+        bootstrap.ShowGameOverScreen();
     }
 }
