@@ -3,58 +3,79 @@ using System.Reflection;
 using UnityEngine;
 
 /// <summary>
-/// Invokes game-over UI on BootstrapRuntime without a compile-time reference to that type,
-/// so HeroKnight and the rest of the game compile even if BootstrapRuntime is missing or out of sync (CS0246).
+/// Invokes BootstrapRuntime game-over without a compile-time type reference (HeroKnight must always compile).
+/// Uses AddComponent("BootstrapRuntime") when reflection fails — same as the Editor does for script names.
 /// </summary>
 public static class GameOverNotifier
 {
-    const string BootstrapTypeName = "BootstrapRuntime";
+    const string ScriptClassName = "BootstrapRuntime";
     const string HostObjectName = "BootstrapRuntime";
     const string ShowMethodMessage = "ShowGameOverScreen";
 
     public static void Raise()
     {
-        Type bootstrapType = FindBootstrapComponentType();
-
-        if (bootstrapType != null)
-        {
-            MethodInfo ensure = bootstrapType.GetMethod(
-                "EnsureHostExists",
-                BindingFlags.Public | BindingFlags.Static);
-
-            if (ensure != null)
-                ensure.Invoke(null, null);
-        }
-
         GameObject host = GameObject.Find(HostObjectName);
+        Component bootstrap = host != null ? host.GetComponent(ScriptClassName) : null;
 
-        if (host == null && bootstrapType != null)
+        if (bootstrap == null)
         {
-            host = new GameObject(HostObjectName);
-            UnityEngine.Object.DontDestroyOnLoad(host);
-            host.AddComponent(bootstrapType);
+            if (host == null)
+            {
+                host = new GameObject(HostObjectName);
+                UnityEngine.Object.DontDestroyOnLoad(host);
+            }
+
+            Type resolved = FindBootstrapComponentType();
+            bootstrap = resolved != null ? host.AddComponent(resolved) : host.AddComponent(ScriptClassName);
         }
 
-        if (host != null)
+        if (bootstrap == null)
         {
-            host.SendMessage(ShowMethodMessage, SendMessageOptions.RequireReceiver);
+            if (host != null && host.transform.childCount == 0 &&
+                host.GetComponents<Component>().Length <= 2)
+                UnityEngine.Object.Destroy(host);
+
+            ProfessorFallbackUi.ShowGameOverBoard();
             return;
         }
 
-        Debug.LogError(
-            "Game over UI cannot show: BootstrapRuntime was not found. " +
-            "Restore Assets/BootstrapRuntime.cs from the repo (branch adel-al-ashi).");
+        TryInvokeEnsureHostExists(bootstrap.GetType());
+        host.SendMessage(ShowMethodMessage, SendMessageOptions.RequireReceiver);
+    }
 
-        Time.timeScale = 0f;
+    static void TryInvokeEnsureHostExists(Type bootstrapType)
+    {
+        if (bootstrapType == null)
+            return;
+
+        MethodInfo ensure = bootstrapType.GetMethod(
+            "EnsureHostExists",
+            BindingFlags.Public | BindingFlags.Static);
+
+        if (ensure != null)
+            ensure.Invoke(null, null);
     }
 
     static Type FindBootstrapComponentType()
     {
+        string[] simpleNames =
+        {
+            ScriptClassName,
+            "BootstrapRuntime",
+        };
+
         foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
         {
-            Type direct = asm.GetType(BootstrapTypeName);
-            if (direct != null && typeof(Component).IsAssignableFrom(direct))
-                return direct;
+            foreach (string name in simpleNames)
+            {
+                Type direct = asm.GetType(name);
+                if (direct != null && typeof(Component).IsAssignableFrom(direct))
+                    return direct;
+            }
+
+            Type qualified = asm.GetType(ScriptClassName + ", Assembly-CSharp");
+            if (qualified != null && typeof(Component).IsAssignableFrom(qualified))
+                return qualified;
 
             Type[] types;
             try
@@ -76,7 +97,7 @@ public static class GameOverNotifier
             foreach (Type t in types)
             {
                 if (t != null &&
-                    t.Name == BootstrapTypeName &&
+                    t.Name == ScriptClassName &&
                     typeof(Component).IsAssignableFrom(t))
                     return t;
             }

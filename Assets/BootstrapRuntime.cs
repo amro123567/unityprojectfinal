@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -61,6 +62,17 @@ public sealed class BootstrapRuntime : MonoBehaviour
         Scene bootScene = SceneManager.GetActiveScene();
         if (bootScene.IsValid() && bootScene.isLoaded)
             SceneLoadedHandler(bootScene, LoadSceneMode.Single);
+        else
+            StartCoroutine(CoDeferredInitialUiBoot());
+    }
+
+    IEnumerator CoDeferredInitialUiBoot()
+    {
+        yield return null;
+        yield return null;
+        Scene s = SceneManager.GetActiveScene();
+        if (s.IsValid() && s.isLoaded && hudSurface.childCount == 0)
+            SceneLoadedHandler(s, LoadSceneMode.Single);
     }
 
     void OnDestroy()
@@ -93,14 +105,17 @@ public sealed class BootstrapRuntime : MonoBehaviour
         if (SaveSystem.Instance == null)
             new GameObject("SaveSystem").AddComponent<SaveSystem>();
 
-        if (Object.FindFirstObjectByType<EventSystem>() == null)
-        {
-            GameObject es = new GameObject("EventSystem");
-            es.AddComponent<EventSystem>();
-            es.AddComponent<StandaloneInputModule>();
-        }
-
         WarmSlidePool();
+    }
+
+    static void EnsureEventSystemForUi()
+    {
+        if (Object.FindFirstObjectByType<EventSystem>() != null)
+            return;
+
+        GameObject es = new GameObject("EventSystem");
+        es.AddComponent<EventSystem>();
+        es.AddComponent<StandaloneInputModule>();
     }
 
     void WarmSlidePool()
@@ -119,6 +134,9 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void SceneLoadedHandler(Scene scene, LoadSceneMode mode)
     {
+        EnsureEventSystemForUi();
+        ProfessorFallbackUi.Clear();
+
         PauseFlow.PauseMenuEnabled = true;
 
         ClearGameOverUi();
@@ -240,7 +258,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void BuildMainMenuShell()
     {
-        Canvas canvas = CreateCanvas(hudSurface, 5200);
+        Canvas canvas = CreateCanvas(hudSurface, 6800);
         GraphicRaycaster raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
         raycaster.ignoreReversedGraphics = true;
 
