@@ -4,10 +4,12 @@ using UnityEngine.UI;
 public sealed class LiveHud : MonoBehaviour
 {
     Text readout;
+    HeroKnight trackedHero;
 
     public void Bind(Text label)
     {
         readout = label;
+        trackedHero = null;
     }
 
     void LateUpdate()
@@ -15,7 +17,10 @@ public sealed class LiveHud : MonoBehaviour
         if (readout == null)
             return;
 
-        HeroKnight hero = FindObjectOfType<HeroKnight>();
+        if (trackedHero == null)
+            trackedHero = Object.FindFirstObjectByType<HeroKnight>();
+
+        HeroKnight hero = trackedHero;
 
         if (hero == null)
         {

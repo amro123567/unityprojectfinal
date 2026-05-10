@@ -53,7 +53,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         if (SaveSystem.Instance == null)
             new GameObject("SaveSystem").AddComponent<SaveSystem>();
 
-        if (Object.FindObjectOfType<EventSystem>() == null)
+        if (Object.FindFirstObjectByType<EventSystem>() == null)
         {
             GameObject es = new GameObject("EventSystem");
             es.AddComponent<EventSystem>();
