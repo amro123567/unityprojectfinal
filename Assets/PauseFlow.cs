@@ -47,16 +47,14 @@ public sealed class PauseFlow : MonoBehaviour
         if (veil != null)
             return;
 
-        Canvas hud = HudSurfaceBus.ActiveCanvas != null ? HudSurfaceBus.ActiveCanvas : FocusCanvas;
-
-        if (hud == null)
+        if (FocusCanvas == null)
             return;
 
         GameObject overlay = new GameObject("PauseVeil");
 
         veil = overlay.AddComponent<RectTransform>();
 
-        veil.SetParent(hud.transform, false);
+        veil.SetParent(FocusCanvas.transform, false);
 
         veil.SetAsLastSibling();
         veil.anchorMin = Vector2.zero;
@@ -194,10 +192,8 @@ public sealed class PauseFlow : MonoBehaviour
 
     void TuneAudioHandler()
     {
-        Canvas hud = HudSurfaceBus.ActiveCanvas != null ? HudSurfaceBus.ActiveCanvas : FocusCanvas;
-
-        if (hud != null)
-            OptionsHost.Toggle(hud.transform);
+        if (FocusCanvas != null)
+            OptionsHost.Toggle(FocusCanvas.transform);
     }
 
     void JourneyHome()

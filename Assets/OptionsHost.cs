@@ -28,7 +28,7 @@ public static class OptionsHost
 
     static void BuildSurface(Transform context)
     {
-        Canvas host = HudSurfaceBus.ActiveCanvas;
+        Canvas host = PauseFlow.FocusCanvas;
 
         if (host == null && context != null)
             host = context.GetComponentInParent<Canvas>();

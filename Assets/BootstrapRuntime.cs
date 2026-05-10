@@ -80,7 +80,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
     void SceneLoadedHandler(Scene scene, LoadSceneMode mode)
     {
         OptionsHost.DropSurface();
-        HudSurfaceBus.Clear();
+        PauseFlow.FocusCanvas = null;
 
         foreach (Transform child in hudSurface)
             Destroy(child.gameObject);
@@ -206,7 +206,6 @@ public sealed class BootstrapRuntime : MonoBehaviour
         hudDriver.Bind(label);
 
         PauseFlow.FocusCanvas = canvas;
-        HudSurfaceBus.ActiveCanvas = canvas;
     }
 
     Canvas CreateCanvas(Transform parent)
