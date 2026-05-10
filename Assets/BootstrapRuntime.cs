@@ -91,7 +91,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         foreach (Transform child in hudSurface)
             Destroy(child.gameObject);
 
-        bool useMainMenuUi = IsMainHubScene(scene);
+        bool useMainMenuUi = HubSceneUtility.IsMainHubScene(scene);
 
         if (useMainMenuUi)
             BuildMainMenuShell();
@@ -102,29 +102,6 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
             SpawnExitGate(scene.buildIndex);
         }
-    }
-
-    /// <summary>
-    /// True for build index 0 and for editor Play on scenes named MainMenu / "Main Menu".
-    /// </summary>
-    public static bool IsMainHubScene(Scene scene)
-    {
-        string n = string.IsNullOrEmpty(scene.name) ? string.Empty : scene.name.Trim();
-
-        if (scene.buildIndex == 0)
-            return true;
-
-        if (scene.buildIndex < 0)
-        {
-            string compact = n.Replace(" ", string.Empty);
-            if (compact.Equals("MainMenu", System.StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (n.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-        }
-
-        return false;
     }
 
     void ClearGameOverUi()

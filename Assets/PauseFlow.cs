@@ -65,7 +65,7 @@ public sealed class PauseFlow : MonoBehaviour
 
     static bool IsGameplayLevelScene(Scene scene)
     {
-        return !BootstrapRuntime.IsMainHubScene(scene);
+        return !HubSceneUtility.IsMainHubScene(scene);
     }
 
     void TryRebuildVeilIfNeeded()
