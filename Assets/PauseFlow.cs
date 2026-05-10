@@ -17,6 +17,8 @@ public sealed class PauseFlow : MonoBehaviour
 
     Font labelFont;
 
+    int panelBuildPasses;
+
     void Awake()
     {
         Instance = this;
@@ -40,6 +42,14 @@ public sealed class PauseFlow : MonoBehaviour
 
     void Update()
     {
+        if (veil == null && FocusCanvas != null && panelBuildPasses < 180)
+        {
+            panelBuildPasses++;
+            BuildPanel();
+            if (veil != null && !menuOpen)
+                veil.gameObject.SetActive(false);
+        }
+
         if (!PauseMenuEnabled)
             return;
 

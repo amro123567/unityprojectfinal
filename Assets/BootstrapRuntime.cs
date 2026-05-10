@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -14,6 +15,12 @@ public sealed class BootstrapRuntime : MonoBehaviour
     Transform hudSurface;
     Font uiFont;
     GameObject gameOverOverlay;
+
+    Font ResolveUIFont()
+    {
+        uiFont ??= GameUiFonts.DefaultUIFont();
+        return uiFont;
+    }
 
     /// <summary>
     /// Creates the bootstrap host if needed. Safe to call from gameplay (e.g. death) before any UI has run.
@@ -62,6 +69,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
             SceneLoadedHandler(bootScene, LoadSceneMode.Single);
         else
             StartCoroutine(CoDeferredInitialUiBoot());
+
+        StartCoroutine(EnsureGameplayUiHealthy());
     }
 
     IEnumerator CoDeferredInitialUiBoot()
@@ -71,6 +80,61 @@ public sealed class BootstrapRuntime : MonoBehaviour
         Scene s = SceneManager.GetActiveScene();
         if (s.IsValid() && s.isLoaded && hudSurface.childCount == 0)
             SceneLoadedHandler(s, LoadSceneMode.Single);
+    }
+
+    /// <summary>
+    /// Re-applies menu/HUD if the first pass missed (scene timing, partial exceptions, font init).
+    /// </summary>
+    IEnumerator EnsureGameplayUiHealthy()
+    {
+        for (int pass = 0; pass < 20; pass++)
+        {
+            yield return null;
+
+            if (hudSurface == null)
+                continue;
+
+            Scene s = SceneManager.GetActiveScene();
+            if (!s.IsValid() || !s.isLoaded)
+                continue;
+
+            uiFont ??= GameUiFonts.DefaultUIFont();
+
+            bool hub = HubSceneUtility.IsMainHubScene(s);
+
+            bool needsRebuild =
+                hub
+                    ? hudSurface.childCount == 0
+                    : PauseFlow.FocusCanvas == null || PauseFlow.Instance == null;
+
+            if (needsRebuild)
+            {
+                try
+                {
+                    SceneLoadedHandler(s, LoadSceneMode.Single);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError(
+                        $"BootstrapRuntime: UI rebuild attempt failed ({s.name}). {ex.Message}\n{ex.StackTrace}");
+                }
+            }
+
+            hub = HubSceneUtility.IsMainHubScene(s);
+
+            bool happy =
+                hub ? hudSurface.childCount > 0
+                    : PauseFlow.FocusCanvas != null && PauseFlow.Instance != null;
+
+            if (happy)
+                yield break;
+        }
+
+        Scene final = SceneManager.GetActiveScene();
+        Debug.LogWarning(
+            $"BootstrapRuntime: UI did not converge. scene={final.name} buildIndex={final.buildIndex} " +
+            $"hudChildren={hudSurface?.childCount ?? -1} FocusCanvas={(PauseFlow.FocusCanvas != null)} " +
+            $"PauseFlow={(PauseFlow.Instance != null)} Font={(GameUiFonts.DefaultUIFont() != null)}");
     }
 
     void OnDestroy()
@@ -132,6 +196,21 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void SceneLoadedHandler(Scene scene, LoadSceneMode mode)
     {
+        try
+        {
+            SceneLoadedHandlerCore(scene, mode);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError(
+                $"BootstrapRuntime SceneLoadedHandler failed for '{scene.name}': {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
+    void SceneLoadedHandlerCore(Scene scene, LoadSceneMode mode)
+    {
+        ResolveUIFont();
+
         EnsureEventSystemForUi();
         ProfessorFallbackUi.Clear();
 
@@ -159,11 +238,18 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void SuppressStaleSceneHealthBars()
     {
-        HealthBarUI[] bars = Object.FindObjectsOfType<HealthBarUI>(true);
-        for (int i = 0; i < bars.Length; i++)
+        try
         {
-            if (bars[i] != null)
-                bars[i].gameObject.SetActive(false);
+            HealthBarUI[] bars = Object.FindObjectsOfType<HealthBarUI>(true);
+            for (int i = 0; i < bars.Length; i++)
+            {
+                if (bars[i] != null)
+                    bars[i].gameObject.SetActive(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"BootstrapRuntime: could not hide legacy health bars: {ex.Message}");
         }
     }
 
@@ -252,7 +338,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void BuildMainMenuShell()
     {
-        Canvas canvas = CreateCanvas(hudSurface, 6800);
+        Canvas canvas = CreateCanvas(hudSurface, 28600);
         GraphicRaycaster raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
         raycaster.ignoreReversedGraphics = true;
 
@@ -324,7 +410,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void BuildHudShell()
     {
-        Canvas canvas = CreateCanvas(hudSurface, 6200);
+        Canvas canvas = CreateCanvas(hudSurface, 28400);
         canvas.gameObject.AddComponent<GraphicRaycaster>();
 
         GameObject cluster = new GameObject("HudCluster");
@@ -401,7 +487,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
         shadow.effectDistance = new Vector2(1.8f, -1.8f);
 
-        label.font = uiFont;
+        label.font = ResolveUIFont();
         label.fontSize = 26;
         label.alignment = TextAnchor.UpperLeft;
         label.color = body;
@@ -486,7 +572,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         hintLe.minHeight = 38f;
 
         Text ht = hint.AddComponent<Text>();
-        ht.font = uiFont;
+        ht.font = ResolveUIFont();
         ht.fontSize = 17;
         ht.alignment = TextAnchor.MiddleRight;
         ht.color = new Color(0.92f, 0.74f, 0.54f);
@@ -511,7 +597,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         StretchUiFull(capRect);
 
         Text capText = cap.AddComponent<Text>();
-        capText.font = uiFont;
+        capText.font = ResolveUIFont();
         capText.fontSize = 23;
         capText.text = "Pause menu";
         capText.color = Color.white;
@@ -556,7 +642,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         go.transform.SetParent(parent, false);
 
         Text text = go.AddComponent<Text>();
-        text.font = uiFont;
+        text.font = ResolveUIFont();
         text.fontSize = size;
 
         text.alignment = TextAnchor.MiddleCenter;
@@ -608,7 +694,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         textRect.offsetMax = Vector2.zero;
 
         Text text = textGo.AddComponent<Text>();
-        text.font = uiFont;
+        text.font = ResolveUIFont();
         text.fontSize = 26;
         text.alignment = TextAnchor.MiddleCenter;
         text.text = caption;
