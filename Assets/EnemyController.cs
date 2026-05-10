@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 
 public class EnemyController : MonoBehaviour
 {
@@ -125,6 +126,10 @@ public class EnemyController : MonoBehaviour
 
         if (animator == null)
             animator = GetComponent<Animator>();
+
+        NavMeshAgent nav = GetComponent<NavMeshAgent>();
+        if (nav != null)
+            nav.enabled = false;
 
         GameObject p = GameObject.FindGameObjectWithTag("Player");
         if (p != null)

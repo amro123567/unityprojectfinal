@@ -334,11 +334,9 @@ public class HeroKnight : MonoBehaviour
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayPlayerDeath();
 
-        enabled = false;
+        GameOverNotifier.Raise();
 
-        GameObject bootstrapHost = GameObject.Find("BootstrapRuntime");
-        if (bootstrapHost != null)
-            bootstrapHost.SendMessage("ShowGameOverScreen", SendMessageOptions.DontRequireReceiver);
+        enabled = false;
     }
 
     public float GetHealthPercent() =>

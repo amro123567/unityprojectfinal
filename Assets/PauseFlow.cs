@@ -6,8 +6,10 @@ public sealed class PauseFlow : MonoBehaviour
 {
     public static Canvas FocusCanvas;
 
-    /// <summary>When false, Esc pause is ignored (e.g. game over).</summary>
+    /// <summary>When false, pause input is ignored (e.g. game over).</summary>
     public static bool PauseMenuEnabled { get; set; } = true;
+
+    public static PauseFlow Instance { get; private set; }
 
     bool menuOpen;
 
@@ -17,6 +19,8 @@ public sealed class PauseFlow : MonoBehaviour
 
     void Awake()
     {
+        Instance = this;
+
         labelFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
         if (labelFont == null)
             labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -25,16 +29,40 @@ public sealed class PauseFlow : MonoBehaviour
         SetMenuVisible(false);
     }
 
+    void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
+    void Start()
+    {
+        TryRebuildVeilIfNeeded();
+    }
+
     void Update()
     {
         if (!PauseMenuEnabled)
             return;
 
-        if (Input.GetKeyDown(KeyCode.Escape))
-            ToggleMenu();
+        bool hotkey = Input.GetKeyDown(KeyCode.Escape)
+            || Input.GetKeyDown(KeyCode.Tab)
+            || Input.GetKeyDown(KeyCode.P);
+
+        if (hotkey)
+            RequestTogglePause();
     }
 
-    /// <returns>False for main-menu scenes; true when playing a level scene (includes editor Play with buildIndex -1).</returns>
+    /// <summary>Called by the on-screen Pause chip in the HUD.</summary>
+    public static void RequestTogglePause()
+    {
+        if (Instance == null)
+            return;
+
+        Instance.TryRebuildVeilIfNeeded();
+        Instance.TryFlipPause();
+    }
+
     static bool IsGameplayLevelScene(Scene scene)
     {
         bool namedMenu =
@@ -49,8 +77,21 @@ public sealed class PauseFlow : MonoBehaviour
         return scene.buildIndex >= 1;
     }
 
-    void ToggleMenu()
+    void TryRebuildVeilIfNeeded()
     {
+        if (veil != null)
+            return;
+
+        BuildPanel();
+
+        if (veil != null && !menuOpen)
+            veil.gameObject.SetActive(false);
+    }
+
+    void TryFlipPause()
+    {
+        TryRebuildVeilIfNeeded();
+
         if (veil == null)
             return;
 
@@ -62,8 +103,15 @@ public sealed class PauseFlow : MonoBehaviour
 
     void SetMenuVisible(bool state)
     {
+        if (veil == null)
+            return;
+
         menuOpen = state;
         veil.gameObject.SetActive(state);
+
+        if (state)
+            veil.SetAsLastSibling();
+
         Time.timeScale = state ? 0f : 1f;
     }
 
@@ -99,7 +147,7 @@ public sealed class PauseFlow : MonoBehaviour
 
         Title(stack.transform, "Paused", 38f);
 
-        Title(stack.transform, "(Esc closes this pause menu)", 18);
+        Title(stack.transform, "(Esc / Tab / P or Pause button toggles pause)", 18);
 
         LinkButton(stack.transform, "Resume", ResumeClicked);
 

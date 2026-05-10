@@ -134,32 +134,20 @@ public sealed class BootstrapRuntime : MonoBehaviour
         Time.timeScale = 0f;
         PauseFlow.PauseMenuEnabled = false;
 
-        Transform parentSurface = PauseFlow.FocusCanvas != null
-            ? PauseFlow.FocusCanvas.transform
-            : null;
+        Canvas shell = BuildTopSortingCanvas();
+        gameOverOverlay = shell.gameObject;
 
-        if (parentSurface == null)
-        {
-            Canvas hud = CreateCanvas(hudSurface);
-            hud.gameObject.AddComponent<GraphicRaycaster>();
-            PauseFlow.FocusCanvas = hud;
-            parentSurface = hud.transform;
-        }
+        GameObject tintGo = new GameObject("GameOverTint");
+        tintGo.transform.SetParent(shell.transform, false);
+        RectTransform tintRect = tintGo.AddComponent<RectTransform>();
+        StretchUiFull(tintRect);
 
-        GameObject root = new GameObject("GameOverOverlay");
-        gameOverOverlay = root;
-
-        RectTransform frame = root.AddComponent<RectTransform>();
-        frame.SetParent(parentSurface, false);
-        frame.anchorMin = Vector2.zero;
-        frame.anchorMax = Vector2.one;
-        frame.offsetMin = Vector2.zero;
-        frame.offsetMax = Vector2.zero;
-
-        root.AddComponent<Image>().color = new Color(0.02f, 0.015f, 0.012f, 0.92f);
+        Image dim = tintGo.AddComponent<Image>();
+        dim.color = new Color(0.02f, 0.015f, 0.012f, 0.92f);
+        dim.raycastTarget = true;
 
         VerticalLayoutGroup stack =
-            PanelStack(root.transform, new Color(0f, 0f, 0f, 0.45f));
+            PanelStack(shell.transform, new Color(0f, 0f, 0f, 0.52f));
 
         Heading(stack.transform, "Game Over", 44).color =
             new Color(0.98f, 0.58f, 0.35f);
@@ -185,7 +173,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
             SceneLoader.Instance?.LoadScene(0);
         });
 
-        root.transform.SetAsLastSibling();
+        stack.transform.SetAsLastSibling();
     }
 
     void SpawnExitGate(int idx)
@@ -299,6 +287,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
         hudDriver.Bind(label);
 
         PauseFlow.FocusCanvas = canvas;
+
+        AppendHudPauseControl(canvas);
     }
 
     Canvas CreateCanvas(Transform parent)
@@ -309,7 +299,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
         Canvas canvas = go.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 4000;
+        canvas.sortingOrder = 4800;
 
         CanvasScaler scaler = go.AddComponent<CanvasScaler>();
 
@@ -319,6 +309,89 @@ public sealed class BootstrapRuntime : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
 
         return canvas;
+    }
+
+    Canvas BuildTopSortingCanvas()
+    {
+        GameObject go = new GameObject("BootstrapTopUICanvas");
+        go.transform.SetParent(transform, false);
+
+        Canvas canvas = go.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 32760;
+
+        go.AddComponent<GraphicRaycaster>();
+
+        CanvasScaler scaler = go.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        return canvas;
+    }
+
+    static void StretchUiFull(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
+    void AppendHudPauseControl(Canvas gameplayCanvas)
+    {
+        GameObject dock = new GameObject("HudPauseDock");
+        dock.transform.SetParent(gameplayCanvas.transform, false);
+
+        RectTransform dockRect = dock.AddComponent<RectTransform>();
+        dockRect.anchorMin = new Vector2(1f, 1f);
+        dockRect.anchorMax = new Vector2(1f, 1f);
+        dockRect.pivot = new Vector2(1f, 1f);
+        dockRect.anchoredPosition = new Vector2(-22f, -20f);
+
+        VerticalLayoutGroup col = dock.AddComponent<VerticalLayoutGroup>();
+        col.childAlignment = TextAnchor.UpperRight;
+        col.spacing = 10f;
+
+        GameObject hint = new GameObject("PauseHints");
+        hint.transform.SetParent(dock.transform, false);
+
+        LayoutElement hintLe = hint.AddComponent<LayoutElement>();
+        hintLe.minHeight = 38f;
+
+        Text ht = hint.AddComponent<Text>();
+        ht.font = uiFont;
+        ht.fontSize = 17;
+        ht.alignment = TextAnchor.MiddleRight;
+        ht.color = new Color(0.92f, 0.74f, 0.54f);
+        ht.text = "Pause: Esc  •  Tab  •  P";
+
+        GameObject tap = new GameObject("HudPauseTap");
+        tap.transform.SetParent(dock.transform, false);
+
+        LayoutElement tapLe = tap.AddComponent<LayoutElement>();
+        tapLe.minWidth = 154f;
+        tapLe.minHeight = 54f;
+
+        Image plate = tap.AddComponent<Image>();
+        plate.color = new Color(0.26f, 0.17f, 0.09f, 0.94f);
+
+        Button btn = tap.AddComponent<Button>();
+        btn.targetGraphic = plate;
+
+        GameObject cap = new GameObject("Cap");
+        cap.transform.SetParent(tap.transform, false);
+        RectTransform capRect = cap.AddComponent<RectTransform>();
+        StretchUiFull(capRect);
+
+        Text capText = cap.AddComponent<Text>();
+        capText.font = uiFont;
+        capText.fontSize = 23;
+        capText.text = "Pause menu";
+        capText.color = Color.white;
+        capText.alignment = TextAnchor.MiddleCenter;
+
+        btn.onClick.AddListener(() => PauseFlow.RequestTogglePause());
     }
 
     VerticalLayoutGroup PanelStack(Transform parent, Color backdrop)
