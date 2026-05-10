@@ -101,9 +101,9 @@ public class HeroKnight : MonoBehaviour
         if (data == null)
             return;
 
-        int idx = SceneManager.GetActiveScene().buildIndex;
+        int slot = SceneLevelSlot.Active();
 
-        bool sameSceneSlot = idx == data.currentLevel;
+        bool sameSceneSlot = slot == data.currentLevel;
         bool hasHp = data.playerHealth > 0.5f;
 
         if (!sameSceneSlot || !hasHp)
@@ -134,9 +134,12 @@ public class HeroKnight : MonoBehaviour
         if (svc == null || isDead)
             return;
 
-        int idx = Mathf.Max(1, SceneManager.GetActiveScene().buildIndex);
+        int slot = SceneLevelSlot.Active();
 
-        svc.SaveGame(transform, currentHealth, idx, svc.GetData().score, svc.GetData().hasDoubleJump);
+        if (slot < 1)
+            return;
+
+        svc.SaveGame(transform, currentHealth, slot, svc.GetData().score, svc.GetData().hasDoubleJump);
     }
 
     void RecomputeJumpBudget()

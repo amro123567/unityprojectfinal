@@ -124,6 +124,36 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         return _font;
     }
 
+    /// <summary>Writes current level slot, HP and player XY to SaveSystem before loading the hub scene.</summary>
+    void SaveAndReturnToMainMenuFromPause()
+    {
+        SaveSystem svc = SaveSystem.Instance;
+        Scene s = SceneManager.GetActiveScene();
+        int slot = SceneLevelSlot.ForScene(s);
+        HeroKnight hero = FindFirstHero();
+
+        SetPaused(false);
+        Time.timeScale = 1f;
+
+        if (svc != null)
+        {
+            SaveSystem.GameData data = svc.GetData();
+
+            if (hero != null)
+            {
+                svc.SaveGame(hero.transform, hero.GetHealthCurrent(), slot,
+                    Mathf.Max(0, data.score), data.hasDoubleJump);
+            }
+            else
+            {
+                svc.SaveSession(data.playerX, data.playerY, data.playerHealth, slot,
+                    Mathf.Max(0, data.score), data.hasDoubleJump);
+            }
+        }
+
+        SceneLoader.Instance?.LoadScene(0);
+    }
+
     void Update()
     {
         if (_pauseOverlay != null && _levelRoot != null && _levelRoot.activeSelf)
@@ -288,8 +318,8 @@ public sealed class MandatoryCourseUi : MonoBehaviour
 
         AddCaption(
             v.transform,
-            "New Journey clears save. Continue restores last level + health.",
-            20,
+            "New Journey resets save. Continue resumes your last paused session (scene + HP + position).",
+            19,
             new Color(0.92f, 0.84f, 0.72f));
 
         SaveSystem saver = SaveSystem.Instance;
@@ -319,7 +349,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
 
         AddMenuButton(v.transform, "AUDIO / MIX", () => OptionsHost.Toggle(_rootCanvas.transform));
 
-        AddMenuButton(v.transform, "QUIT", () =>
+        AddMenuButton(v.transform, "QUIT GAME", () =>
         {
             SceneLoader.Instance?.QuitGame();
 
@@ -368,18 +398,17 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         v.padding = new RectOffset(24, 24, 28, 28);
 
         AddCaption(v.transform, "PAUSED", 38, Color.white);
-        AddCaption(v.transform, "Tap RESUME / use Esc or P.", 17, new Color(0.9f, 0.8f, 0.65f));
+        AddCaption(
+            v.transform,
+            "• Resume play here •  Tab • P • Esc toggle\n• SAVE → MAIN MENU keeps this spot for CONTINUE",
+            16,
+            new Color(0.9f, 0.8f, 0.65f));
 
         AddMenuButton(v.transform, "RESUME", () => SetPaused(false));
         AddMenuButton(v.transform, "AUDIO / MIX", () => OptionsHost.Toggle(_rootCanvas.transform));
-        AddMenuButton(v.transform, "MAIN MENU", () =>
-        {
-            SetPaused(false);
-            Time.timeScale = 1f;
-            SceneLoader.Instance?.LoadScene(0);
-        });
+        AddMenuButton(v.transform, "SAVE → MAIN MENU", SaveAndReturnToMainMenuFromPause);
 
-        AddMenuButton(v.transform, "QUIT", () =>
+        AddMenuButton(v.transform, "QUIT GAME", () =>
         {
             SceneLoader.Instance?.QuitGame();
 
@@ -466,27 +495,38 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         r.anchorMin = new Vector2(1f, 1f);
         r.anchorMax = new Vector2(1f, 1f);
         r.pivot = new Vector2(1f, 1f);
-        r.anchoredPosition = new Vector2(-18f, -18f);
-        r.sizeDelta = new Vector2(280f, 96f);
+        r.anchoredPosition = new Vector2(-12f, -12f);
+        r.sizeDelta = new Vector2(400f, 128f);
 
         Image plate = go.AddComponent<Image>();
         plate.sprite = SpriteUtilityWhite();
         plate.color = new Color(1f, 0.72f, 0.06f, 1f);
+        plate.raycastTarget = true;
 
         _pauseOpenButton = go.AddComponent<Button>();
         _pauseOpenButton.targetGraphic = plate;
         _pauseOpenButton.onClick.AddListener(TogglePauseOverlay);
+        Navigation nav = _pauseOpenButton.navigation;
+        nav.mode = Navigation.Mode.None;
+        _pauseOpenButton.navigation = nav;
+
+        Shadow sh = go.AddComponent<Shadow>();
+        sh.effectDistance = new Vector2(3f, -3f);
+
+        LayoutElement sizing = go.AddComponent<LayoutElement>();
+        sizing.minHeight = 120f;
 
         GameObject cap = new GameObject("Cap");
         cap.transform.SetParent(go.transform, false);
         Stretch(cap.AddComponent<RectTransform>());
         Text t = cap.AddComponent<Text>();
         t.font = TextFontOrDefault();
-        t.fontSize = 30;
+        t.supportRichText = true;
+        t.fontSize = 26;
         t.fontStyle = FontStyle.Bold;
-        t.color = Color.black;
+        t.color = new Color(0.12f, 0.06f, 0f);
         t.alignment = TextAnchor.MiddleCenter;
-        t.text = "TAP HERE — PAUSE";
+        t.text = "<b>PAUSE</b>\n<size=20>Tap / Tab • P • Esc</size>";
     }
 
     void HideLegacyHealthBars()

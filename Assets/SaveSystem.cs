@@ -41,12 +41,33 @@ public class SaveSystem : MonoBehaviour
 
     public void SaveGame(Transform playerTransform, float health, int level, int score, bool doubleJump)
     {
-        gameData.playerHealth   = health;
-        gameData.currentLevel   = level;
-        gameData.score          = score;
-        gameData.hasDoubleJump  = doubleJump;
-        gameData.playerX        = playerTransform.position.x;
-        gameData.playerY        = playerTransform.position.y;
+        if (gameData == null)
+            LoadGame();
+
+        Vector3 p = playerTransform != null
+            ? playerTransform.position
+            : new Vector3(gameData.playerX, gameData.playerY, 0f);
+
+        WritePersistPayload(p.x, p.y, health, level, score, doubleJump);
+    }
+
+    /// <summary>Used when quitting to hub without a Transform (keeps prior coordinates).</summary>
+    public void SaveSession(float px, float py, float health, int level, int score, bool doubleJump)
+    {
+        if (gameData == null)
+            LoadGame();
+
+        WritePersistPayload(px, py, health, level, score, doubleJump);
+    }
+
+    void WritePersistPayload(float px, float py, float health, int level, int score, bool doubleJump)
+    {
+        gameData.playerHealth = health;
+        gameData.currentLevel = level;
+        gameData.score = score;
+        gameData.hasDoubleJump = doubleJump;
+        gameData.playerX = px;
+        gameData.playerY = py;
 
         string json = JsonUtility.ToJson(gameData);
         PlayerPrefs.SetString(SAVE_KEY, json);
