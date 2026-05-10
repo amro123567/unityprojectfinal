@@ -341,8 +341,9 @@ public class HeroKnight : MonoBehaviour
 
         enabled = false;
 
-        if (BootstrapRuntime.Active != null)
-            BootstrapRuntime.Active.ShowGameOverScreen();
+        GameObject bootstrapHost = GameObject.Find("BootstrapRuntime");
+        if (bootstrapHost != null)
+            bootstrapHost.SendMessage("ShowGameOverScreen", SendMessageOptions.DontRequireReceiver);
     }
 
     public float GetHealthPercent() =>

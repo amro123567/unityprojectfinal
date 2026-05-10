@@ -50,6 +50,10 @@ namespace CodeMonkey.HealthSystemCM {
         /// Update Health Bar using the Image fillAmount based on the current Health Amount
         /// </summary>
         private void UpdateHealthBar() {
+            if (image == null || healthSystem == null) {
+                return;
+            }
+
             image.fillAmount = healthSystem.GetHealthNormalized();
         }
 
@@ -57,7 +61,9 @@ namespace CodeMonkey.HealthSystemCM {
         /// Clean up events when this Game Object is destroyed
         /// </summary>
         private void OnDestroy() {
-            healthSystem.OnHealthChanged -= HealthSystem_OnHealthChanged;
+            if (healthSystem != null) {
+                healthSystem.OnHealthChanged -= HealthSystem_OnHealthChanged;
+            }
         }
 
     }
