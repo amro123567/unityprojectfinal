@@ -6,25 +6,22 @@ using UnityEngine.SceneManagement;
 public static class HubSceneUtility
 {
     /// <summary>
-    /// True for build index 0 and for editor Play on scenes named MainMenu / Main Menu (name contains MainMenu).
+    /// Hub is identified by scene <b>name</b> (MainMenu), not by build index — the first scene in Build Settings is not
+    /// always the menu (and a level can legally be at build index 0 in student/minimal builds).
     /// </summary>
     public static bool IsMainHubScene(Scene scene)
     {
-        string n = string.IsNullOrEmpty(scene.name) ? string.Empty : scene.name.Trim();
+        if (!scene.IsValid())
+            return false;
 
-        if (scene.buildIndex == 0)
+        string n = string.IsNullOrEmpty(scene.name) ? string.Empty : scene.name.Trim();
+        if (n.Length == 0)
+            return false;
+
+        string compact = n.Replace(" ", string.Empty);
+        if (compact.Equals("MainMenu", System.StringComparison.OrdinalIgnoreCase))
             return true;
 
-        if (scene.buildIndex < 0)
-        {
-            string compact = n.Replace(" ", string.Empty);
-            if (compact.Equals("MainMenu", System.StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            if (n.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-        }
-
-        return false;
+        return n.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
