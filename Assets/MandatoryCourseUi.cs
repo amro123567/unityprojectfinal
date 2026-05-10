@@ -15,6 +15,12 @@ public sealed class MandatoryCourseUi : MonoBehaviour
 {
     public static MandatoryCourseUi Instance { get; private set; }
 
+    /// <summary>
+    /// Set by SceneLoader (and reload paths) when the player deliberately leaves the hub for a playable level.
+    /// Player builds sometimes mis-report scene naming/active scene during sceneLoaded — this overrides hub UI.
+    /// </summary>
+    public static bool PreferGameplayHudOnNextRebuild;
+
     const int SortOrder = 45000;
 
     Font _font;
@@ -37,9 +43,8 @@ public sealed class MandatoryCourseUi : MonoBehaviour
     static void RuntimeBootMandatoryUi()
     {
         Ensure();
-        Scene s = SceneManager.GetActiveScene();
-        if (Instance != null && s.IsValid() && s.isLoaded)
-            Instance.RebuildForScene(s);
+        // Do not rebuild here: BootstrapRuntime.sceneLoaded + Awake Dispatch own fresh UI using the loaded scene handle.
+        // Rebuilding off GetActiveScene() can race badly in standalone builds around the initial frame.
     }
 
     public static void Ensure()
@@ -76,6 +81,9 @@ public sealed class MandatoryCourseUi : MonoBehaviour
     IEnumerator CoRebuildNextFrame()
     {
         yield return null;
+        if (_rootCanvas != null)
+            yield break;
+
         Scene s = SceneManager.GetActiveScene();
         if (s.IsValid() && s.isLoaded)
             RebuildForScene(s);
@@ -120,13 +128,21 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         BuildCanvasSkeleton();
         PauseFlow.FocusCanvas = _rootCanvas;
 
-        if (HubSceneUtility.IsMainHubScene(scene))
+        bool gameplayByIntent = PreferGameplayHudOnNextRebuild;
+        if (gameplayByIntent)
+            PreferGameplayHudOnNextRebuild = false;
+
+        bool showHub =
+            !gameplayByIntent &&
+            HubSceneUtility.IsMainHubScene(scene);
+
+        if (showHub)
             BuildHub(scene);
         else
             BuildLevel(scene);
 
         Debug.Log(
-            $"MandatoryCourseUi: built UI for '{scene.name}' (buildIndex={scene.buildIndex}). " +
+            $"MandatoryCourseUi: built UI for '{scene.name}' (buildIndex={scene.buildIndex}, hub={(showHub ? "yes" : "no")}). " +
             "If nothing shows, check Console errors and Hierarchy → DontDestroyOnLoad → MandatoryCourseUi.");
     }
 
