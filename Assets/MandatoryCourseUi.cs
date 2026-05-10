@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
@@ -10,6 +11,7 @@ using CodeMonkey.HealthSystemCM;
 /// Self-contained course UI: main menu hub, gameplay HUD + health bar fill, oversized PAUSE button, pause panel (resume / audio / main menu / quit).
 /// Does not rely on PauseFlow or the old Bootstrap canvas stack.
 /// </summary>
+[DefaultExecutionOrder(-9000)]
 public sealed class MandatoryCourseUi : MonoBehaviour
 {
     public static MandatoryCourseUi Instance { get; private set; }
@@ -29,6 +31,17 @@ public sealed class MandatoryCourseUi : MonoBehaviour
 
     GameObject _pauseOverlay;
     bool _paused;
+
+    bool _scheduledRetry;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void RuntimeBootMandatoryUi()
+    {
+        Ensure();
+        Scene s = SceneManager.GetActiveScene();
+        if (Instance != null && s.IsValid() && s.isLoaded)
+            Instance.RebuildForScene(s);
+    }
 
     public static void Ensure()
     {
@@ -50,6 +63,23 @@ public sealed class MandatoryCourseUi : MonoBehaviour
 
         Instance = this;
         _font = GameUiFonts.DefaultUIFont();
+    }
+
+    void Start()
+    {
+        if (_scheduledRetry)
+            return;
+
+        _scheduledRetry = true;
+        StartCoroutine(CoRebuildNextFrame());
+    }
+
+    IEnumerator CoRebuildNextFrame()
+    {
+        yield return null;
+        Scene s = SceneManager.GetActiveScene();
+        if (s.IsValid() && s.isLoaded)
+            RebuildForScene(s);
     }
 
     void OnDestroy()
@@ -82,6 +112,16 @@ public sealed class MandatoryCourseUi : MonoBehaviour
             BuildHub(scene);
         else
             BuildLevel(scene);
+
+        Debug.Log(
+            $"MandatoryCourseUi: built UI for '{scene.name}' (buildIndex={scene.buildIndex}). " +
+            "If nothing shows, check Console errors and Hierarchy → DontDestroyOnLoad → MandatoryCourseUi.");
+    }
+
+    Font TextFontOrDefault()
+    {
+        _font ??= GameUiFonts.DefaultUIFont();
+        return _font;
     }
 
     void Update()
@@ -197,7 +237,6 @@ public sealed class MandatoryCourseUi : MonoBehaviour
     {
         GameObject holder = new GameObject("MandatoryUiRoot");
         holder.transform.SetParent(transform, false);
-        DontDestroyOnLoad(holder);
 
         _rootCanvas = holder.AddComponent<Canvas>();
         _rootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -225,7 +264,9 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         hub.transform.SetParent(_layer, false);
         Stretch(hub.AddComponent<RectTransform>());
 
-        hub.AddComponent<Image>().color = new Color(0.05f, 0.035f, 0.022f, 0.94f);
+        Image hubBg = hub.AddComponent<Image>();
+        hubBg.sprite = SpriteUtilityWhite();
+        hubBg.color = new Color(0.05f, 0.035f, 0.022f, 0.94f);
 
         GameObject card = new GameObject("MenuCard");
         card.transform.SetParent(hub.transform, false);
@@ -235,6 +276,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         cr.sizeDelta = new Vector2(680f, 720f);
 
         Image cardBg = card.AddComponent<Image>();
+        cardBg.sprite = SpriteUtilityWhite();
         cardBg.color = new Color(0.1f, 0.06f, 0.036f, 1f);
 
         VerticalLayoutGroup v = card.AddComponent<VerticalLayoutGroup>();
@@ -305,6 +347,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         Stretch(veil.AddComponent<RectTransform>());
 
         Image dim = veil.AddComponent<Image>();
+        dim.sprite = SpriteUtilityWhite();
         dim.color = new Color(0.02f, 0.02f, 0.03f, 0.86f);
         dim.raycastTarget = true;
 
@@ -316,6 +359,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         cr.sizeDelta = new Vector2(560f, 520f);
 
         Image cbg = card.AddComponent<Image>();
+        cbg.sprite = SpriteUtilityWhite();
         cbg.color = new Color(0.09f, 0.056f, 0.032f, 0.99f);
 
         VerticalLayoutGroup v = card.AddComponent<VerticalLayoutGroup>();
@@ -402,7 +446,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         tr.offsetMax = new Vector2(-6f, -36f);
 
         _healthText = textGo.AddComponent<Text>();
-        _healthText.font = _font;
+        _healthText.font = TextFontOrDefault();
         _healthText.fontSize = 26;
         _healthText.fontStyle = FontStyle.Bold;
         _healthText.alignment = TextAnchor.UpperLeft;
@@ -437,7 +481,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         cap.transform.SetParent(go.transform, false);
         Stretch(cap.AddComponent<RectTransform>());
         Text t = cap.AddComponent<Text>();
-        t.font = _font;
+        t.font = TextFontOrDefault();
         t.fontSize = 30;
         t.fontStyle = FontStyle.Bold;
         t.color = Color.black;
@@ -471,7 +515,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         le.minHeight = size + 12f;
 
         Text t = go.AddComponent<Text>();
-        t.font = _font;
+        t.font = TextFontOrDefault();
         t.fontSize = size;
         t.alignment = TextAnchor.MiddleCenter;
         t.color = color;
@@ -499,7 +543,7 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         Stretch(txt.AddComponent<RectTransform>());
 
         Text tfield = txt.AddComponent<Text>();
-        tfield.font = _font;
+        tfield.font = TextFontOrDefault();
         tfield.fontSize = 26;
         tfield.alignment = TextAnchor.MiddleCenter;
         tfield.color = new Color(0.97f, 0.91f, 0.74f);
@@ -511,10 +555,11 @@ public sealed class MandatoryCourseUi : MonoBehaviour
     static ColorBlock ButtonStyle()
     {
         ColorBlock c = ColorBlock.defaultColorBlock;
+        c.normalColor = Color.white;
+        c.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.5f);
+        c.highlightedColor = new Color(0.92f, 0.78f, 0.55f);
 
-        c.highlightedColor = new Color(0.85f, 0.53f, 0.18f);
-
-        c.pressedColor = new Color(0.62f, 0.33f, 0.095f);
+        c.pressedColor = new Color(0.72f, 0.52f, 0.22f);
 
         return c;
     }
