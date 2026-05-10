@@ -14,7 +14,7 @@ public static class OptionsHost
         if (shell == null)
             return;
 
-        Object.Destroy(shell);
+        UnityEngine.Object.Destroy(shell);
         shell = null;
     }
 
