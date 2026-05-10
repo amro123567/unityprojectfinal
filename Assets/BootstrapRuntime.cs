@@ -9,6 +9,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     Transform hudSurface;
     Font uiFont;
+    GameObject gameOverOverlay;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void CreateHost()
@@ -31,6 +32,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
         Active = this;
         uiFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        if (uiFont == null)
+            uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         hudSurface = new GameObject("RuntimeUISurface").transform;
         hudSurface.SetParent(transform, false);
@@ -79,15 +82,20 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void SceneLoadedHandler(Scene scene, LoadSceneMode mode)
     {
+        ClearGameOverUi();
         OptionsHost.DropSurface();
         PauseFlow.FocusCanvas = null;
 
         foreach (Transform child in hudSurface)
             Destroy(child.gameObject);
 
-        int index = scene.buildIndex;
+        bool menuByName =
+            scene.name.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0;
 
-        if (index <= 0)
+        bool useMainMenuUi = scene.buildIndex == 0
+            || (scene.buildIndex < 0 && menuByName);
+
+        if (useMainMenuUi)
             BuildMainMenuShell();
         else
         {
@@ -96,6 +104,83 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
             SpawnExitGate(scene.buildIndex);
         }
+    }
+
+    void ClearGameOverUi()
+    {
+        if (gameOverOverlay != null)
+        {
+            Destroy(gameOverOverlay);
+            gameOverOverlay = null;
+        }
+    }
+
+    public void ShowGameOverScreen()
+    {
+        if (gameOverOverlay != null)
+            return;
+
+        if (uiFont == null)
+        {
+            uiFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            if (uiFont == null)
+                uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        Time.timeScale = 0f;
+
+        Transform parentSurface = PauseFlow.FocusCanvas != null
+            ? PauseFlow.FocusCanvas.transform
+            : null;
+
+        if (parentSurface == null)
+        {
+            Canvas hud = CreateCanvas(hudSurface);
+            hud.gameObject.AddComponent<GraphicRaycaster>();
+            PauseFlow.FocusCanvas = hud;
+            parentSurface = hud.transform;
+        }
+
+        GameObject root = new GameObject("GameOverOverlay");
+        gameOverOverlay = root;
+
+        RectTransform frame = root.AddComponent<RectTransform>();
+        frame.SetParent(parentSurface, false);
+        frame.anchorMin = Vector2.zero;
+        frame.anchorMax = Vector2.one;
+        frame.offsetMin = Vector2.zero;
+        frame.offsetMax = Vector2.zero;
+
+        root.AddComponent<Image>().color = new Color(0.02f, 0.015f, 0.012f, 0.92f);
+
+        VerticalLayoutGroup stack =
+            PanelStack(root.transform, new Color(0f, 0f, 0f, 0.45f));
+
+        Heading(stack.transform, "Game Over", 44).color =
+            new Color(0.98f, 0.58f, 0.35f);
+
+        Text blurbGo = Heading(stack.transform, "The forest claims another wanderer.", 22);
+        blurbGo.color = new Color(0.92f, 0.82f, 0.74f);
+
+        PrimaryButton(stack.transform, "Try Again", () =>
+        {
+            Time.timeScale = 1f;
+            Scene s = SceneManager.GetActiveScene();
+            ClearGameOverUi();
+            if (s.buildIndex >= 0)
+                SceneManager.LoadScene(s.buildIndex);
+            else if (!string.IsNullOrEmpty(s.name))
+                SceneManager.LoadScene(s.name);
+        });
+
+        PrimaryButton(stack.transform, "Main Menu", () =>
+        {
+            Time.timeScale = 1f;
+            ClearGameOverUi();
+            SceneLoader.Instance?.LoadScene(0);
+        });
+
+        root.transform.SetAsLastSibling();
     }
 
     void SpawnExitGate(int idx)

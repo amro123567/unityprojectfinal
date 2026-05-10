@@ -304,6 +304,8 @@ public class HeroKnight : MonoBehaviour
         foreach (Collider2D hit in hits)
         {
             EnemyController enemy = hit.GetComponent<EnemyController>();
+            if (enemy == null)
+                enemy = hit.GetComponentInParent<EnemyController>();
 
             if (enemy != null)
                 enemy.TakeDamage(attackDamage);
@@ -338,6 +340,9 @@ public class HeroKnight : MonoBehaviour
             AudioManager.Instance.PlayPlayerDeath();
 
         enabled = false;
+
+        if (BootstrapRuntime.Active != null)
+            BootstrapRuntime.Active.ShowGameOverScreen();
     }
 
     public float GetHealthPercent() =>

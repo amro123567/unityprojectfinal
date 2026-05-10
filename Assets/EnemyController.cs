@@ -8,24 +8,110 @@ public class EnemyController : MonoBehaviour
     [Header("References")]
     public Animator animator;
 
-    private Transform player;
-    private HeroKnight playerScript;
-    private float currentHealth;
-    private Vector3 startPosition;
-    private float patrolTarget;
-    private float patrolTimer;
-    private float attackCooldown = 0f;
-    private bool movingRight = true;
-    private bool isDead = false;
-    private Rigidbody2D rb;
-    private SpriteRenderer sr;
-    private bool defaultFacingRight;
+    Transform player;
+    HeroKnight playerScript;
+    float currentHealth;
+    Vector3 startPosition;
+    float patrolTarget;
+    float patrolTimer;
+    float attackCooldown = 0f;
+    bool movingRight = true;
+    bool isDead = false;
+    Rigidbody2D rb;
+    SpriteRenderer sr;
+    bool defaultFacingRight;
 
-    private enum State { Patrol, Chase, Attack }
-    private State currentState = State.Patrol;
+    enum State { Patrol, Chase, Attack }
+    State currentState = State.Patrol;
+
+    float walkingTriggerThrottle;
+
+    bool TriggerExists(string parameterName)
+    {
+        if (animator == null)
+            return false;
+
+        foreach (AnimatorControllerParameter p in animator.parameters)
+        {
+            if (p.name == parameterName && p.type == AnimatorControllerParameterType.Trigger)
+                return true;
+        }
+
+        return false;
+    }
+
+    bool TryFireTrigger(string parameterName)
+    {
+        if (animator == null || !TriggerExists(parameterName))
+            return false;
+
+        animator.SetTrigger(parameterName);
+        return true;
+    }
+
+    void PulseWalkingAnimator(bool wantsMove)
+    {
+        if (animator == null)
+            return;
+
+        foreach (AnimatorControllerParameter p in animator.parameters)
+        {
+            if (p.name != "Walking")
+                continue;
+
+            switch (p.type)
+            {
+                case AnimatorControllerParameterType.Bool:
+                    animator.SetBool("Walking", wantsMove);
+                    return;
+                case AnimatorControllerParameterType.Trigger:
+                    if (wantsMove)
+                    {
+                        walkingTriggerThrottle -= Time.deltaTime;
+                        if (walkingTriggerThrottle <= 0f)
+                        {
+                            animator.SetTrigger("Walking");
+                            walkingTriggerThrottle = 0.45f;
+                        }
+                    }
+                    else
+                    {
+                        walkingTriggerThrottle = 0f;
+                        animator.ResetTrigger("Walking");
+                    }
+
+                    return;
+            }
+        }
+    }
+
+    void FireMeleeAttackAnimator()
+    {
+        if (!TryFireTrigger("Attack"))
+            TryFireTrigger("Attacking");
+    }
+
+    void FireHitAnimator()
+    {
+        if (!TryFireTrigger("Hit"))
+            TryFireTrigger("Hurt");
+    }
+
+    void FireDeathAnimator()
+    {
+        if (!TryFireTrigger("Die"))
+            TryFireTrigger("Death");
+    }
 
     void Start()
     {
+        if (data == null)
+        {
+            Debug.LogError($"{name}: assign EnemyData on EnemyController.", this);
+            enabled = false;
+            return;
+        }
+
         currentHealth = data.maxHealth;
         startPosition = transform.position;
         SetPatrolTarget();
@@ -33,10 +119,8 @@ public class EnemyController : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         sr = GetComponent<SpriteRenderer>();
 
-        // Detect original facing direction from Y rotation
         defaultFacingRight = (transform.eulerAngles.y < 90f || transform.eulerAngles.y > 270f);
 
-        // Reset Y rotation so flip logic works cleanly
         transform.eulerAngles = new Vector3(transform.eulerAngles.x, 0f, transform.eulerAngles.z);
 
         if (animator == null)
@@ -49,7 +133,6 @@ public class EnemyController : MonoBehaviour
             playerScript = p.GetComponent<HeroKnight>();
         }
 
-        // Ignore physical collision with player (no pushing)
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
         {
@@ -77,16 +160,21 @@ public class EnemyController : MonoBehaviour
 
         switch (currentState)
         {
-            case State.Patrol: Patrol(); break;
-            case State.Chase:  Chase();  break;
-            case State.Attack: AttackPlayer(); break;
+            case State.Patrol:
+                Patrol();
+                break;
+            case State.Chase:
+                Chase();
+                break;
+            case State.Attack:
+                AttackPlayer();
+                break;
         }
     }
 
-    // BEHAVIOR 1: Patrol
     void Patrol()
     {
-        SetAnim("Walking", true);
+        PulseWalkingAnimator(true);
 
         float dir = patrolTarget - transform.position.x;
         if (rb != null)
@@ -97,7 +185,7 @@ public class EnemyController : MonoBehaviour
         if (Mathf.Abs(transform.position.x - patrolTarget) < 0.15f)
         {
             if (rb != null) rb.velocity = new Vector2(0, rb.velocity.y);
-            SetAnim("Walking", false);
+            PulseWalkingAnimator(false);
             patrolTimer -= Time.deltaTime;
             if (patrolTimer <= 0f)
             {
@@ -107,10 +195,9 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    // BEHAVIOR 2: Chase
     void Chase()
     {
-        SetAnim("Walking", true);
+        PulseWalkingAnimator(true);
         FlipToward(player.position.x);
 
         float dir = player.position.x - transform.position.x;
@@ -118,16 +205,15 @@ public class EnemyController : MonoBehaviour
             rb.velocity = new Vector2(Mathf.Sign(dir) * data.moveSpeed, rb.velocity.y);
     }
 
-    // BEHAVIOR 3: Attack
     void AttackPlayer()
     {
         if (rb != null) rb.velocity = new Vector2(0, rb.velocity.y);
-        SetAnim("Walking", false);
+        PulseWalkingAnimator(false);
         FlipToward(player.position.x);
 
         if (attackCooldown <= 0f)
         {
-            TriggerAnim("Attack");
+            FireMeleeAttackAnimator();
             attackCooldown = 1.5f;
 
             if (AudioManager.Instance != null)
@@ -145,7 +231,7 @@ public class EnemyController : MonoBehaviour
         if (isDead) return;
         currentHealth -= amount;
         Debug.Log(gameObject.name + " HP: " + currentHealth);
-        TriggerAnim("Hit");
+        FireHitAnimator();
 
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayEnemyHurt();
@@ -156,7 +242,7 @@ public class EnemyController : MonoBehaviour
     void Die()
     {
         isDead = true;
-        TriggerAnim("Die");
+        FireDeathAnimator();
 
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayEnemyDeath();
@@ -164,7 +250,7 @@ public class EnemyController : MonoBehaviour
         if (rb != null) rb.velocity = Vector2.zero;
         Collider2D col = GetComponent<Collider2D>();
         if (col != null) col.enabled = false;
-        this.enabled = false;
+        enabled = false;
         Destroy(gameObject, 2f);
     }
 
@@ -172,18 +258,8 @@ public class EnemyController : MonoBehaviour
     {
         if (sr == null) return;
         float dir = targetX - transform.position.x;
-        if (dir > 0.05f)       sr.flipX = !defaultFacingRight;
+        if (dir > 0.05f) sr.flipX = !defaultFacingRight;
         else if (dir < -0.05f) sr.flipX = defaultFacingRight;
-    }
-
-    void SetAnim(string param, bool value)
-    {
-        if (animator != null) animator.SetBool(param, value);
-    }
-
-    void TriggerAnim(string param)
-    {
-        if (animator != null) animator.SetTrigger(param);
     }
 
     void SetPatrolTarget()

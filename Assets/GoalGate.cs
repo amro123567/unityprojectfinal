@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public sealed class GoalGate : MonoBehaviour
 {
@@ -7,7 +8,14 @@ public sealed class GoalGate : MonoBehaviour
 
     public void Configure(int activeBuildIndex)
     {
-        if (activeBuildIndex == 2)
+        Scene scene = SceneManager.GetActiveScene();
+        string sn = scene.name;
+
+        bool isLevel2 =
+            activeBuildIndex == 2 ||
+            sn.IndexOf("Level2", System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+        if (isLevel2)
         {
             grantDoubleJump = false;
             destinationBuildIndex = 0;
