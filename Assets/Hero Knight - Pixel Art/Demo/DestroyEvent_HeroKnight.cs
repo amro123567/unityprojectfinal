@@ -8,6 +8,15 @@ public class DestroyEvent_HeroKnight : MonoBehaviour
     // destroyEvent() is called as an event in animations.
     public void destroyEvent()
     {
+        var pool = ObjectPool.Instance;
+        PooledObject po = GetComponent<PooledObject>();
+
+        if (pool != null && po != null && !string.IsNullOrEmpty(po.poolTag))
+        {
+            pool.ReturnToPool(po.poolTag, gameObject);
+            return;
+        }
+
         Destroy(gameObject);
     }
 }
