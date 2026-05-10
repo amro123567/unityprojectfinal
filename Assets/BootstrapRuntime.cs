@@ -67,8 +67,16 @@ public sealed class BootstrapRuntime : MonoBehaviour
             Active = null;
     }
 
-    void OnSceneLoaded(Scene scene, LoadSceneMode mode) =>
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (mode != LoadSceneMode.Single)
+            return;
+
+        if (!scene.IsValid() || !scene.isLoaded)
+            return;
+
         DispatchSceneBoot(scene);
+    }
 
     void DispatchSceneBoot(Scene scene)
     {
@@ -85,6 +93,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
 
     void DispatchSceneBootCore(Scene scene)
     {
+        scene = ResolveBootstrapScene(scene);
+
         EnsureEventSystemForUi();
         ProfessorFallbackUi.Clear();
 
@@ -101,6 +111,19 @@ public sealed class BootstrapRuntime : MonoBehaviour
             SpawnExitGate(scene.buildIndex);
 
         WarmSlidePool();
+    }
+
+    /// <summary>Picks the Single scene Unity just finished loading; GetActiveScene can lag behind in some player builds.</summary>
+    static Scene ResolveBootstrapScene(Scene hint)
+    {
+        if (hint.IsValid() && hint.isLoaded)
+            return hint;
+
+        Scene active = SceneManager.GetActiveScene();
+        if (active.IsValid() && active.isLoaded)
+            return active;
+
+        return hint;
     }
 
     /// <summary>Public hook if other systems spawn UI before Mandatory runs.</summary>

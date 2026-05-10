@@ -90,7 +90,20 @@ public sealed class MandatoryCourseUi : MonoBehaviour
     public void RebuildForScene(Scene scene)
     {
         if (!scene.IsValid() || !scene.isLoaded)
+        {
+            Scene a = SceneManager.GetActiveScene();
+            if (a.IsValid() && a.isLoaded)
+                scene = a;
+        }
+
+        if (!scene.IsValid() || !scene.isLoaded)
+        {
+            TearDownUi();
+            _paused = false;
+            Time.timeScale = 1f;
+            StartCoroutine(CoRebuildWhenSceneReady(scene));
             return;
+        }
 
         _font ??= GameUiFonts.DefaultUIFont();
         _paused = false;
@@ -115,6 +128,22 @@ public sealed class MandatoryCourseUi : MonoBehaviour
         Debug.Log(
             $"MandatoryCourseUi: built UI for '{scene.name}' (buildIndex={scene.buildIndex}). " +
             "If nothing shows, check Console errors and Hierarchy → DontDestroyOnLoad → MandatoryCourseUi.");
+    }
+
+    IEnumerator CoRebuildWhenSceneReady(Scene _)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            yield return null;
+            Scene a = SceneManager.GetActiveScene();
+            if (a.IsValid() && a.isLoaded)
+            {
+                RebuildForScene(a);
+                yield break;
+            }
+        }
+
+        Debug.LogWarning("MandatoryCourseUi: could not resolve a loaded active scene for UI rebuild.");
     }
 
     Font TextFontOrDefault()

@@ -19,9 +19,13 @@ public static class HubSceneUtility
             return false;
 
         string compact = n.Replace(" ", string.Empty);
-        if (compact.Equals("MainMenu", System.StringComparison.OrdinalIgnoreCase))
-            return true;
 
-        return n.IndexOf("MainMenu", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        // Authoritative gameplay scenes: never show the hub overlay on these.
+        if (compact.Length >= 6 &&
+            compact.StartsWith("Level", System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Hub is only the menu scene (exact name / compact), not "first build index" or loose substring matches.
+        return compact.Equals("MainMenu", System.StringComparison.OrdinalIgnoreCase);
     }
 }
