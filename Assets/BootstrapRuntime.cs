@@ -181,13 +181,8 @@ public sealed class BootstrapRuntime : MonoBehaviour
         PrimaryButton(stack.transform, "Try Again", () =>
         {
             Time.timeScale = 1f;
-            Scene s = SceneManager.GetActiveScene();
             ClearGameOverUi();
-            if (s.buildIndex >= 0)
-                SceneManager.LoadScene(s.buildIndex);
-
-            else if (!string.IsNullOrEmpty(s.name))
-                SceneManager.LoadScene(s.name);
+            DeathReplay.RestartCurrentScene();
         });
 
         PrimaryButton(stack.transform, "Main Menu", () =>

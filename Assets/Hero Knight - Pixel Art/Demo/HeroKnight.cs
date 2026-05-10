@@ -93,6 +93,9 @@ public class HeroKnight : MonoBehaviour
 
     void HydrateFromSaveIfMatchingScene()
     {
+        if (DeathReplay.ConsumeSkipHydrateIfSet())
+            return;
+
         SaveSystem svc = SaveSystem.Instance;
         if (svc == null || !svc.HasSave)
             return;

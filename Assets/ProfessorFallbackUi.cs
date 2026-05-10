@@ -65,11 +65,7 @@ public static class ProfessorFallbackUi
         {
             Time.timeScale = 1f;
             Clear();
-            Scene s = SceneManager.GetActiveScene();
-            if (s.buildIndex >= 0)
-                SceneManager.LoadScene(s.buildIndex);
-            else if (!string.IsNullOrEmpty(s.name))
-                SceneManager.LoadScene(s.name);
+            DeathReplay.RestartCurrentScene();
         });
 
         AddButton(col.transform, font, "Main Menu", () =>

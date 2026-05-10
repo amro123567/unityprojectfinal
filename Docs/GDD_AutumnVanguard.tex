@@ -1,0 +1,170 @@
+% Game Design Document — Autumn Vanguard
+% Compile with pdfLaTeX on Overleaf (menu: Compiler → pdfLaTeX).
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{graphicx}
+
+\hypersetup{colorlinks=true, linkcolor=blue!45!black, urlcolor=blue!45!black, citecolor=blue!45!black}
+
+\title{\textbf{Game Design Document}\\
+       \Large Game Programming --- Project 2\\
+       \vspace{0.5em}
+       \Huge Autumn Vanguard}
+\author{(Fall / Autumn Theme --- 2D Action Platformer)}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+\textit{Autumn Vanguard} is a 2D side-scrolling action platformer developed in Unity. The player explores forested, autumn-toned environments, engages enemies using melee combat and mobility tools, progresses across authored levels with scene-based transitions, and benefits from resilient UI, audio mixing, persistence, lightweight pooling, and a clear hub-based flow between sessions.
+\end{abstract}
+
+\section{Product Identity}
+
+\begin{tabular}{@{}ll@{}}
+\textbf{Working title (in-engine)} & Autumn Vanguard \\
+\textbf{Alternate branding}       & Autumn Knight (course / marketing shorthand) \\
+\textbf{Genre}                    & 2D action-adventure platformer with combat \\
+\textbf{Unity render pipeline}   & Universal Render Pipeline (URP), 2D lighting \\
+\textbf{Audience}                & Casual to intermediate platformer players; course demo \\
+\textbf{Elevator pitch}        & Navigate autumn forests, defeat hostiles with readable attacks and a dodge roll, clear levels, optionally resume progress from the hub. \\
+\end{tabular}
+
+\section{Team Information}
+
+\noindent
+\textit{Replace contribution text below only if your instructor requires edits; IDs are retained from your draft.}
+
+\vspace{0.5em}
+\begin{tabular}{@{}p{3.8cm}p{9.2cm}p{2cm}@{}}
+\toprule
+\textbf{Team member} & \textbf{Primary contributions (high level)} & \textbf{ID} \\
+\midrule
+Adel Al Ashi &
+UI \& UX flow (menus, HUD, pause, persistence wiring, input reliability), gameplay integration, polish, submission assets (including GDD drafts). &
+202302202 \\
+Mohammad Ali Amro &
+Enemy confrontation loop, tuning, encounters, combat-related iteration. &
+202306319 \\
+Ali Khalifeh &
+Scene composition, level geometry and readability, staging, animation polish in scene context. &
+202302468 \\
+Karim Rahhal &
+Audio behaviours, tuning, optimisation passes, QA support. &
+202204191 \\
+\bottomrule
+\end{tabular}
+
+\section{Game Overview}
+
+\subsection{Goals}
+Players should (1)~learn movement and offence quickly, (2)~survive encounters through timing more than brute force, (3)~reach the end portal of each playable level to advance difficulty, (4)~use the hub to start a clean run (\textbf{New Journey}) or honour a saved checkpoint-style session (\textbf{Continue}), and (5)~adjust music and effects volumes independently via the mixer surface.
+
+\subsection{Progression \& Structure}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Hub} --- main menu exposes \textbf{New Journey}, \textbf{Continue}, \textbf{Audio / Mix}, and \textbf{Quit Game}.
+    \item \textbf{Levels} --- multiple Unity scenes authored for vertical slice play; portals mark successful completion of an area and transition onward or back to hub depending on pacing.
+    \item \textbf{Failure} --- on player defeat the active level reloads as a cold start (scene reset): enemies and layout respawn like a fresh launch of that scene; hub-based \textbf{Continue} remains available for deliberate mid-run resumes.
+\end{itemize}
+
+\subsection{Fantasy \& Mood}
+Quiet, temperate forest palettes (umber, amber, muted greens); crisp movement and punchy melee feedback layered over a calm biome read.
+
+\section{Theme Integration --- Fall / Autumn}
+
+\begin{itemize}[leftmargin=*]
+    \item Palette emphasises oranges, russet browns, gold highlights, subdued sky tones.
+    \item Environment art uses layered parallax forestry and tonal grading friendly to sprites.
+    \item Atmospheric sound (wind, brittle foliage, restrained musical bed) reinforces season without gimmick VO.
+\end{itemize}
+
+\section{Core Mechanics}
+
+\subsection{Movement}
+Horizontal locomotion (\texttt{Horizontal} input axis), jump (\texttt{Space}), roll / dash analogue (\texttt{Left Shift}), wall-interaction \& gravity handled by authored physics materials and animation state.
+
+\subsection{Combat}
+Primary melee executed with mouse input; layering includes wind-up/readable hit windows, directional facing, overlapping circle checks (\texttt{Physics2D.OverlapCircle}) for foes, audible hit feedback (\texttt{SFX}), and Animator-driven wind-down.
+
+\subsection{Enemy Loop}
+Weighted finite behaviour model: patrol between bounds, escalate to chase on detection corridor, melee attack windows when in proximity, revert on loss of target. Die state locks AI and frees navigation colliders.
+
+\subsection{UI / HUD}
+Dynamic runtime canvases assemble: HUD health strip, labelled pause beacon, veil pause card (resume / audio / hub save \& return / quit), hub marketing card \& controls summary. Input stack normalises \texttt{EventSystem} \& \texttt{StandaloneInputModule} across scene swaps.
+
+\section{Controls (keyboard \& mouse baseline)}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Action} & \textbf{Default binding} \\
+\midrule
+Move left / right & \texttt{A} / \texttt{D} or arrow keys \\
+Jump & \texttt{Space} \\
+Roll / dodge analogue & \texttt{Left Shift} \\
+Primary melee & Left mouse button (\texttt{LMB}) \\
+Secondary / alt. mouse action (assigned) & Right mouse (\texttt{RMB}), when enabled \\
+Pause / unpause overlays & \texttt{Escape}, \texttt{Tab}, or \texttt{P}; on-screen beacon \\
+Navigate UI & Mouse + left click \\
+Music / FX mixer & Accessible from pause or hub \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Animations}
+Animator-controlled hero states (idle/run/jump/airborne/attacks/hurt/death \& roll sequencing). Enemies animate patrol, locomotion bursts, melee telegraphs, stagger, and death dissolution in keeping with spritesheet limits.
+
+\section{Scriptable Objects}
+Design data is externalised (\texttt{ScriptableObject} profiles) so tuning does not mandate code edits --- e.g. player stats \& enemy stat sheets.
+
+\section{Data Persistence}
+JSON serialisation via \texttt{PlayerPrefs}: current level slot, planar coordinates, vitality, cumulative score analogue, traversal unlock flag (example: double-jump entitlement). Selecting \textbf{Continue} restores matching-slot scenes; deliberate \textbf{New Journey} clears stored session; pausing \& choosing \textbf{Save $\rightarrow$ Main Menu} persists an intentional bookmark.
+
+\section{Object Pooling}
+Reusable pooled instances service bursty ephemeral VFX (\emph{e.g.} slide dust) to amortise instantiation spikes.
+
+\section{Audio Design}
+
+\begin{itemize}[leftmargin=*]
+    \item Adaptive bed + combat stingers (\texttt{AudioMixer} routed groups).
+    \item Separate sliders for ambience / music lanes vs. action / UI SFX.
+    \item Diegetic cues for jump, melee, enemy death, hazard feedback.
+\end{itemize}
+
+\section{Bonus \& Differentiators}
+Mixer surface; robust pause / hub cohesion; deterministic cold restart on death contrasting hub resume fidelity; authoring-friendly stat Scriptable Objects; modular runtime UI bootstrap reducing scene drift.
+
+\section{Technical Systems Map}
+\texttt{Scriptable Objects} $\cdot$ authored \texttt{Animator} \& blend strategies $\cdot$ \texttt{Physics2D} combat queries $\cdot$ lightweight AI state \& patrol math $\cdot$ \texttt{ObjectPool} façade $\cdot$ JSON persistence façade $\cdot$ additive scene choreography via \texttt{SceneManager}.
+
+\section{Licensing \& Attributions}
+Third-party \& asset-store packages remain governed by their original licences (Fonts: TextMesh\,Pro liberation notice; sprites / demo packs retained per distributor). Maintain \texttt{license.txt} files shipped with bundles in \texttt{/Assets}.
+
+\section{References \& Links}
+Unity Manual (SceneManager, Animator, Physics2D, AudioMixer, UGUI), curated video micro-courses where applicable.
+
+\vspace{0.5em}
+\noindent
+\textbf{Distributable itch.io link (insert before submission):}\\[0.35em]
+\url{https://YOUR-USERNAME.itch.io/YOUR-GAME-SLUG}
+
+\section{Outlook}
+Autumn Vanguard consolidates locomotion readability, tactile combat cadence, and demonstrable intermediate Unity engineering (persistent data, pooled effects, scripted UI scaffolding, AI scaffolding) beneath a cohesive fall visual identity suitable for graded vertical-slice showcases.
+
+\vfill
+\noindent\textit{End of document.}
+
+\end{document}
