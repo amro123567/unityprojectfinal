@@ -16,12 +16,28 @@ public sealed class MandatoryCourseUi : MonoBehaviour
     public static MandatoryCourseUi Instance { get; private set; }
 
     /// <summary>
-    /// Set by SceneLoader (and reload paths) when the player deliberately leaves the hub for a playable level.
-    /// Player builds sometimes mis-report scene naming/active scene during sceneLoaded — this overrides hub UI.
+    /// Overrides hub-vs-level classification for the next <see cref="RebuildForScene"/> (player builds).
     /// </summary>
     public static bool PreferGameplayHudOnNextRebuild;
 
     const int SortOrder = 45000;
+
+    /// <summary>
+    /// Call right after <c>SceneManager.LoadScene*</c> has finished so the DontDestroy mandatory UI mirrors the active scene.
+    /// Fixes standalone builds where <c>sceneLoaded</c> ordering leaves the hub card visible during gameplay.
+    /// </summary>
+    public static void SyncUiNow(bool wantGameplayHud)
+    {
+        PreferGameplayHudOnNextRebuild = wantGameplayHud;
+        Ensure();
+
+        Scene a = SceneManager.GetActiveScene();
+
+        if (Instance == null || !a.IsValid() || !a.isLoaded)
+            return;
+
+        Instance.RebuildForScene(a);
+    }
 
     Font _font;
     Canvas _rootCanvas;

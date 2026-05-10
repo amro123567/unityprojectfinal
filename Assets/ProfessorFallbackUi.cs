@@ -72,8 +72,8 @@ public static class ProfessorFallbackUi
         {
             Time.timeScale = 1f;
             Clear();
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = false;
             SceneManager.LoadScene(0);
+            MandatoryCourseUi.SyncUiNow(false);
         });
 
         AddButton(col.transform, font, "Quit", () =>

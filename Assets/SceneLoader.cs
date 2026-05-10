@@ -24,25 +24,11 @@ public class SceneLoader : MonoBehaviour
     // Call from buttons: SceneLoader.Instance.LoadScene("mainscene")
     public void LoadScene(string sceneName)
     {
-        string c = string.IsNullOrEmpty(sceneName)
-            ? string.Empty
-            : sceneName.Trim().Replace(" ", string.Empty);
-
-        if (c.Equals("MainMenu", StringComparison.OrdinalIgnoreCase))
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = false;
-        else
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = true;
-
         StartCoroutine(LoadAsync(sceneName));
     }
 
     public void LoadScene(int sceneIndex)
     {
-        if (sceneIndex == 0)
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = false;
-        else
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = true;
-
         StartCoroutine(LoadAsync(sceneIndex));
     }
 
@@ -79,6 +65,13 @@ public class SceneLoader : MonoBehaviour
         Time.timeScale = 1f;
 
         if (loadingScreen != null) loadingScreen.SetActive(false);
+
+        string cn = string.IsNullOrEmpty(sceneName)
+            ? string.Empty
+            : sceneName.Trim().Replace(" ", string.Empty);
+
+        bool wantGameplayHud = !cn.Equals("MainMenu", StringComparison.OrdinalIgnoreCase);
+        MandatoryCourseUi.SyncUiNow(wantGameplayHud);
     }
 
     private IEnumerator LoadAsync(int sceneIndex)
@@ -95,5 +88,7 @@ public class SceneLoader : MonoBehaviour
         Time.timeScale = 1f;
 
         if (loadingScreen != null) loadingScreen.SetActive(false);
+
+        MandatoryCourseUi.SyncUiNow(sceneIndex != 0);
     }
 }

@@ -30,19 +30,14 @@ public static class DeathReplay
         Scene scene = SceneManager.GetActiveScene();
         int idx = scene.buildIndex;
 
-        if (idx >= 1)
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = true;
-        else if (idx < 0 && SceneLevelSlot.ForScene(scene) >= 1)
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = true;
-
         if (idx >= 0 && idx < SceneManager.sceneCountInBuildSettings)
             SceneManager.LoadScene(idx, LoadSceneMode.Single);
         else if (!string.IsNullOrEmpty(scene.name))
             SceneManager.LoadScene(scene.name, LoadSceneMode.Single);
         else
-        {
-            MandatoryCourseUi.PreferGameplayHudOnNextRebuild = false;
             SceneManager.LoadScene(0, LoadSceneMode.Single);
-        }
+
+        Scene a = SceneManager.GetActiveScene();
+        MandatoryCourseUi.SyncUiNow(!HubSceneUtility.IsMainHubScene(a));
     }
 }
