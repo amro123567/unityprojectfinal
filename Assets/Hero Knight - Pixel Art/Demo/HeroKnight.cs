@@ -334,7 +334,7 @@ public class HeroKnight : MonoBehaviour
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayPlayerDeath();
 
-        GameOverNotifier.Raise();
+        DeathReplay.RestartCurrentScene();
 
         enabled = false;
     }

@@ -44,9 +44,7 @@ public sealed class MainMenuEscPanel : MonoBehaviour
 
         if (uiFont == null)
         {
-            uiFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            if (uiFont == null)
-                uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            uiFont = GameUiFonts.DefaultUIFont();
         }
 
         Canvas canvas = GetComponent<Canvas>();

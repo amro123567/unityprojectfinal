@@ -21,9 +21,7 @@ public sealed class PauseFlow : MonoBehaviour
     {
         Instance = this;
 
-        labelFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        if (labelFont == null)
-            labelFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        labelFont = GameUiFonts.DefaultUIFont();
 
         BuildPanel();
         SetMenuVisible(false);

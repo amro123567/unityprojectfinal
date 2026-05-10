@@ -20,9 +20,7 @@ public static class ProfessorFallbackUi
 
         Time.timeScale = 0f;
 
-        Font font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        if (font == null)
-            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        Font font = GameUiFonts.DefaultUIFont();
 
         _gameOverRoot = new GameObject("FallbackGameOverRoot");
         UnityEngine.Object.DontDestroyOnLoad(_gameOverRoot);

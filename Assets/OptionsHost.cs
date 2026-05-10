@@ -7,7 +7,7 @@ public static class OptionsHost
 {
     static GameObject shell;
 
-    static Font FontHold => Resources.GetBuiltinResource<Font>("Arial.ttf");
+    static Font FontHold => GameUiFonts.DefaultUIFont();
 
     public static void DropSurface()
     {

@@ -49,9 +49,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
         }
 
         Active = this;
-        uiFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        if (uiFont == null)
-            uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        uiFont = GameUiFonts.DefaultUIFont();
 
         hudSurface = new GameObject("RuntimeUISurface").transform;
         hudSurface.SetParent(transform, false);
@@ -186,11 +184,7 @@ public sealed class BootstrapRuntime : MonoBehaviour
             return;
 
         if (uiFont == null)
-        {
-            uiFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            if (uiFont == null)
-                uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        }
+            uiFont = GameUiFonts.DefaultUIFont();
 
         Time.timeScale = 0f;
         PauseFlow.PauseMenuEnabled = false;
